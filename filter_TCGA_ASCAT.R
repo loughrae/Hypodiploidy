@@ -5,7 +5,7 @@ print('Filtering TCGA')
 #### Import GDC metadata ####
 
 meta <- read.table('../cancer_wgd/GDCquery_results_allcancers.txt', header = TRUE)
-ffpe <- read.table('../cancer_wgd/ffpe.txt', header = TRUE, sep = '\t')
+ffpe <- read.table('../cancer_wgd/ffpe.txt', header = TRUE, sep = '\t') #downloaded using GDCquery from TCGAbiolinks, as described in cancer_wgd/GDCqueries.R
 
 #### Recommended exclusions by ASCAT team ####
 
@@ -37,7 +37,7 @@ filtered_codes <- codes %>%
   filter(Sample.Type %in% c('01', '03', '09')) %>% #remove metastatic and recurrent; keep solid primary tumour and primary blood cancers
   filter(!Patient %in% ascat_exclus) %>% 
   filter(Specimen %in% ffpe[ffpe$is_ffpe == FALSE,]$submitter_id) %>%  #remove FFPE samples
-  arrange(Vial, desc(Plate), Portion) %>%  #Plate is sorted in descending order according to standard (???)
+  arrange(Vial, desc(Plate), Portion) %>%  #Plate sorted as suggested by Broad Institute
   left_join(meta, by = c('Patient')) %>%
   distinct(Patient, .keep_all = TRUE)  
 

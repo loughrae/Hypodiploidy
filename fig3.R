@@ -14,9 +14,6 @@ mitcn_meta <- fread('mitcn_meta.tsv')
 cnh <- read.csv("cnh_vanDijk2021.csv") %>% rowwise() %>%
   mutate(Patient = paste(str_split(Samplename, pattern = "-")[[1]][1:3], collapse = "-"))
 
-clin <- read.table('~/Downloads/clin_query.txt', sep = '\t', header = T) %>% 
-  select(submitter_id, age_at_index, gender, race, disease, vital_status, days_to_death, days_to_last_follow_up)
-
 enough_lh <- tcga_classes %>% filter(group == 'Low-Hypodiploid') %>% count(proj) %>% filter(n >= 15) %>% pull(proj) 
 
 

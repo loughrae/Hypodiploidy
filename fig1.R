@@ -13,7 +13,8 @@ autosome_count_mit <- mitcn_meta %>%
   geom_bar(fill = "black") +
   labs(subtitle = "(a) Acute lymphoblastic leukemia", x = "Autosome Count", y = "Cases") +
   geom_vline(xintercept = 27.5, colour = 'red', linetype = 'dashed') + 
-  geom_vline(xintercept = hypo_threshold - 0.5, colour = 'blue', linetype = 'dashed')
+  geom_vline(xintercept = hypo_threshold - 0.5, colour = 'blue', linetype = 'dashed') +
+  theme_large_classic()
 
 autosomes_graph <- function(df, title) {
   df %>%

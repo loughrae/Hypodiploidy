@@ -222,30 +222,28 @@ diffs <- a1 %>%
   scale_colour_manual(values = c(Adjusted = 'darkgreen', `All cases` = 'darkblue')) + labs(colour = '')
 
 ## Mutational Signatures ##
-all_clinic <- fread('~/PhD/all_clinical.tsv')
-
-joint <- all_clinic %>% 
-  select(Cancer, race, age_at_diagnosis, submitter_id, colnames(all_clinic)[grep('smok', colnames(all_clinic))]) %>% 
-  left_join(tcga_classes, by = c('submitter_id' = 'Patient')) %>%
-  filter(!is.na(Class)) %>%
-  left_join(tcga_mu[, c('Patient', 'total_mu')], by = c('submitter_id' = 'Patient'))
 
 activities <- fread('~/PhD/TCGA/Assignment_Solution/Activities/Assignment_Solution_Activities.txt')
 
-vities <- activities %>% mutate(type = str_extract(Samples, "[^_]+")) %>% 
+vities <- activities %>% 
+  mutate(type = str_extract(Samples, "[^_]+")) %>% 
   mutate(Samples = toupper(sub(".*(tcga*)", "\\1", Samples))) %>% 
   separate(Samples, into = c('tcga', 'bcr', 'pt', NA, NA, NA, NA)) %>% 
   mutate(Patient = paste(tcga, bcr, pt, sep = '-')) %>%
-  left_join(joint, by = c('Patient' = 'submitter_id')) %>% 
+  left_join(tcga_classes, by = c('Patient')) %>%
   filter(!is.na(Class)) %>%
-  mutate(age = age_at_diagnosis / 365.25) %>%
+  left_join(clin, by = c('Patient' = 'submitter_id')) %>% 
+  filter(!is.na(age_at_index)) %>%
+  mutate(polyploidy = Class == 'WGD-high', hypo = Class == 'Low') %>% 
+  left_join(tcga_mu, by = c('Patient', 'proj', 'Class')) %>% 
+  filter(!is.na(total_mu)) %>%
   mutate(polyploidy = Class == 'WGD-high', hypo = Class == 'Low') %>% 
   pivot_longer(SBS1:SBS99, names_to = 'Signature', values_to = 'Activity')
 
 
 sig_poly_pan <- vities %>%
   group_by(Signature) %>%
-  do(tidy(glm(polyploidy ~ Activity + age + total_mu + proj, family = "binomial", data = .))) %>%
+  do(tidy(glm(polyploidy ~ Activity + age_at_index + total_mu + proj, family = "binomial", data = .))) %>%
   filter(term == "Activity") %>%
   ungroup() %>%
   mutate(bh = p.adjust(p.value, method = "BH"))
