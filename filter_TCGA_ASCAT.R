@@ -19,7 +19,7 @@ ascat_exclus <- gsub(',', '', trimws(scan(text = ascat_exclus, what = ',')))
 ascat <- fread('~/cat_all_AS.txt', header = TRUE) %>%
   filter(GDC_Aliquot != 'GDC_Aliquot') #remove interspersed headers from cat
 
-#convert UUIDs to barcodes using TCGAutils to query GDC 
+#convert UUIDs to barcodes using TCGAutils to query GDC
 aliquots <- unique(ascat$GDC_Aliquot) #11104 rows
 codes <- UUIDtoBarcode(aliquots, from_type = 'aliquot_ids') #11104 rows
 
@@ -73,15 +73,15 @@ tcga_losses <- filtered_ascat %>%
 
 tcga_classes <- tcga_losses %>% 
   group_by(GDC_Aliquot, proj, ploidy) %>% #regroup by sample
-  summarize(n_loh_nosex = sum(loss == 'Lost'), n_chr_nosex = sum(chr_somy), min_chr_nosex = sum(min_somy)) %>%
-  mutate(group = ifelse(min_chr_nosex < 28, 'Near-Haploid', ifelse(min_chr_nosex < hypo_threshold, 'Low-Hypodiploid', 'Other'))) %>%
+  summarize(n_loh_nosex = sum(loss == 'Lost'), n_chr_nosex = sum(chr_somy), min_chr_nosex = sum(min_somy), n_disomic_nosex = sum(chr_somy == 2), n_nullisomic_nosex = sum(chr_somy == 0)) %>%
+  mutate(group = ifelse(min_chr_nosex < 28, 'Near-Haploid', ifelse(min_chr_nosex < hypo_threshold, 'Low-Hypodiploid', 'Other'))) %>% #LH should have LOH of >= 6 chromosomes assuming no nullisomies
   left_join(ascat_medicc[, c('sample', 'WGD_status')], by = c('GDC_Aliquot' = 'sample')) %>% 
   mutate(wgd = WGD_status) %>%
   mutate(Class = ifelse(group != 'Other', group, 
                         ifelse(wgd == 'WGD', 'Polyploid', 
-                               ifelse(ploidy >= 1.9 & ploidy <= 2.1, 'Diploid', 'Aneuploid')))) %>% #create 5 ploidy classes
+                               ifelse(n_disomic_nosex == 22, 'Diploid', 'Aneuploid')))) %>% #create 5 ploidy classes
   ungroup() %>%
-  filter(n_chr_nosex >= 22, min_chr_nosex >= 22) %>%
+  filter(n_chr_nosex >= 22, min_chr_nosex >= 22, n_nullisomic_nosex == 0) %>% #there were 2 samples with min_chr_nosex < 22 and 12 samples with a nullisomic autosome
   left_join(codes[, c('portions.analytes.aliquots.aliquot_id', 'Patient')], by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) #all accounted for
   
 

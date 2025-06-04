@@ -154,17 +154,33 @@ confusion <- true_pos_reformat %>%
 fig1a <- (autosome_count_mit / cts_tcga / (cts_brca | cts_kich) / (cts_acc | cts_sarc))
 
 fig1a / (hypo_props | viz ) / ( scatter | overlap | confusion) + plot_layout(heights = c(1, 1, 1, 1, 2, 2))
-ggsave('paper/paper_fig1_2025.png', width = 24, height = 30)
+ggsave('paper/paper_fig1_2025.png', width = 25, height = 32)
+ggsave('paper/paper_fig1_2025.pdf', width = 24, height = 32)
+
 
 ## Supplementary Figure 1
 
-tcga_overlap <- tcga_scores %>%
+target_query <- GDCquery(project = 'TARGET-ALL-P2', data.category = 'Copy Number Variation', access = 'open', workflow.type = 'ASCAT2', data.type = 'Allele-specific Copy Number Segment')
+
+target <- GDCprepare(target_query) #note I did GDCdownload(query) before this
+
+rare_tetra <- target %>%
+  mutate(loh_ind = Minor_Copy_Number == 0) %>%
+  mutate(len = End - Start, prod = Copy_Number*len) %>%
+  group_by(GDC_Aliquot) %>%
+  summarize(loh = sum(loh_ind*len)/sum(len), ploidy = sum(prod)/sum(len)) %>%
+  ggplot(aes(x = ploidy, y = loh)) + geom_point() + stat_cor() +
+  theme_large() + labs(x = 'Ploidy', y = 'Loss of heterozygosity') + ggtitle('(a)')
+
+  
+tcga_heuristic <- tcga_scores %>%
   left_join(tcga_classes, by = c("GDC_Aliquot")) %>%
-  mutate(interest = ifelse(group != "Other" & wgd == "WGD", "Doubled Hypo", ifelse(group == "Other" & n_chr_nosex >= 49 & n_chr_nosex < 65, "Hyperdiploid", "Other"))) %>%
-  filter(interest != "Other") %>%
+  mutate(interest = ifelse(group != "Other" & wgd == "WGD", "Masked Hypo", ifelse(group == "Other" & n_chr_nosex >= 49 & n_chr_nosex <= 65, "Hyperdiploid", "Other"))) %>%
+  filter(interest != "Other") 
+
+tcga_overlap <- tcga_heuristic %>%
   select(interest, n_3, n_4, proj) %>%
   mutate(diff = n_4 - n_3) %>%
-  mutate(interest = ifelse(interest == "Hyperdiploid", "True-Neg", "True-Pos")) %>%
   ggplot(aes(x = diff, fill = interest)) +
   geom_bar(position = "dodge") +
   theme_large() +
@@ -172,4 +188,38 @@ tcga_overlap <- tcga_scores %>%
   scale_fill_manual(values = c("darkgreen", "darkblue")) +
   xlab("Tetrasomies - Trisomies") +
   labs(fill = "") +
-  ylab("Number of cases")
+  ylab("Number of cases") + ggtitle('(b)')
+
+enough_masked_hypo <- tcga_classes %>% filter(group != 'Other', wgd == 'WGD') %>% count(proj) %>% filter(n >= 15) %>% pull(proj) 
+
+tcga_heuristic_accuracy <- tcga_heuristic %>%
+  filter(proj %in% enough_masked_hypo) %>%
+  group_by(proj, interest) %>%
+  summarize(pos_rate = mean(diff > 0)) 
+
+tcga_heuristic_accuracy_plot <- tcga_heuristic_accuracy %>%
+  ggplot(aes(x = proj, fill = interest, y = pos_rate)) +
+  geom_col(position = "dodge") +
+  theme_large() +
+  theme(legend.position = "bottom") +
+  labs(fill = "", x = "Cancer Type", y = "Proportion of Cases with MH Score > 0") +
+  coord_flip() +
+  scale_fill_manual(values = c("darkgreen", "darkblue")) + ggtitle('(c)')
+  
+false_neg_ids <- true_pos %>% filter(diff <= 0) %>% pull(case_id)
+
+false_neg_viz <- mitcn_prep %>%
+  filter(case_id %in% false_neg_ids) %>%
+  mutate(group = factor(group, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Hyperdiploid', 'Other'))) %>%
+  ggplot(aes(x = factor(sub("chr", "", chr), levels = 1:22), y = group, fill = as.factor(chr_somy))) +
+  geom_tile() +
+  facet_wrap(~case_id, nrow = 12, scales = "free_y") +
+  labs(fill = "Somy", x = "Chromosome", y = "") +
+  scale_fill_viridis_d(option = "mako") +
+  theme_large() +
+  theme(legend.position = "right", strip.background = element_blank(), strip.text = element_blank()) +
+  ggtitle('(d)')
+
+figs1 <- (rare_tetra | tcga_overlap) / (tcga_heuristic_accuracy_plot | false_neg_viz)
+ggsave(plot = figs1, file =  'paper/paper_suppfig1_2025.png', width = 25, height = 25)
+ggsave(plot = figs1, file = 'paper/paper_suppfig1_2025.pdf', width = 25, height = 25)

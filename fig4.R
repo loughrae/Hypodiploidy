@@ -62,7 +62,7 @@ lh_volcano <- mu_lh %>%
   filter(term == "ClassLow-Hypodiploid") %>%
   mutate(bh = p.adjust(p.value, method = "BH")) %>%
   mutate(colour_ind = bh < 0.05) %>%
-  filter(estimate > -15) %>% #remove outliers
+  filter(estimate > -10) %>% #remove outliers
   mutate(logp = -1*log10(p.value)) %>%
   mutate(gene_label = ifelse(colour_ind == F, "", paste0(gene, '\n', round(logp, 1)))) %>%
   mutate(gene_label = ifelse(logp > 10, paste0(gene_label, '*'), gene_label)) %>%
@@ -81,7 +81,7 @@ lh_v_poly_mus <- mu_lh %>%
   left_join(mu_poly, by = c("gene"), suffix = c("_lh", "_poly")) %>%
   filter(term_poly == "ClassPolyploid") %>%
   mutate(bh_lh = p.adjust(p.value_lh, method = "BH"), bh_poly = p.adjust(p.value_poly, method = "BH")) %>%
-  filter(estimate_lh > -15) %>%
+  filter(estimate_lh > -10) %>%
   mutate(colour_ind = ifelse(bh_lh < 0.05 & bh_poly < 0.05, "Both", ifelse(bh_lh < 0.05, "Hypo only", ifelse(bh_poly < 0.05, "Polyploids", ifelse(bh_lh >= 0.05 & bh_poly >= 0.05, "n.s.", "what"))))) %>%
   mutate(colour_ind = factor(colour_ind, levels = c('Both', 'Hypo only', 'Polyploids', 'n.s.'))) %>%
   mutate(gene_label = ifelse(colour_ind == "n.s.", "", gene)) %>%

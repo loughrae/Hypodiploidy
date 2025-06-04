@@ -25,7 +25,7 @@ mit_wgd_rate <- mitcn_meta %>%
   mutate(high_wgd_clone = ifelse(ploidy > 2.7, "WGD", "Not WGD")) %>%
   group_by(case_id) %>%
   mutate(any_wgd = sum(high_wgd_clone == "WGD" | case_id %in% wgd_cases | case_id %in% rescues)) %>%
-  mutate(any_group = ifelse(sum(group == "Near-Haploid") > 0, "Near-Haploid", ifelse(sum(group == "Low-Hypodiploid") > 0, "Low-Hypodiploid", "Aneuploid"))) %>%
+  mutate(any_group = ifelse(sum(group == "Near-Haploid") > 0, "Near-Haploid", ifelse(sum(group == "Low-Hypodiploid") > 0, "Low-Hypodiploid", "Other"))) %>%
   distinct(case_id, .keep_all = T) %>%
   mutate(wgd = ifelse(any_wgd > 0, "WGD", "No WGD")) %>%
   mutate(any_group = ifelse(any_group == "Near-Haploid", "NH", ifelse(any_group == "Low-Hypodiploid", "LH", any_group))) %>%
