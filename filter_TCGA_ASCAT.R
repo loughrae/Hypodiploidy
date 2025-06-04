@@ -71,9 +71,9 @@ tcga_losses <- filtered_ascat %>%
   ungroup()
 
 
-tcga_classes <- tcga_losses %>% #now join on SUBMITTER ID!
+tcga_classes <- tcga_losses %>% 
   group_by(GDC_Aliquot, proj, ploidy) %>% #regroup by sample
-  summarize(n_loh = sum(loss == 'Lost'), n_loh_nosex = sum(loss == 'Lost' & !chr %in% c('chrX', 'chrY')), n_chr = sum(chr_somy), min_chr = sum(min_somy), n_chr_nosex = sum(chr_somy[!chr %in% c('chrX', 'chrY')]), min_chr_nosex = sum(min_somy[!chr %in% c('chrX', 'chrY')])) %>%
+  summarize(n_loh_nosex = sum(loss == 'Lost'), n_chr_nosex = sum(chr_somy), min_chr_nosex = sum(min_somy)) %>%
   mutate(group = ifelse(min_chr_nosex < 28, 'Near-Haploid', ifelse(min_chr_nosex < hypo_threshold, 'Low-Hypodiploid', 'Other'))) %>%
   left_join(ascat_medicc[, c('sample', 'WGD_status')], by = c('GDC_Aliquot' = 'sample')) %>% 
   mutate(wgd = WGD_status) %>%
