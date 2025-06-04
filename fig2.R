@@ -36,11 +36,11 @@ mit_chr_losses <- mitcn_prep %>%
   ungroup() 
 
 mit_chr_losses_tojoin <- mit_chr_losses %>% 
-  mutate(Class = ifelse(ploidy > 2.7, 'WGD-high', Class)) %>% #ugh this is a fucking mess
+  mutate(Class = ifelse(ploidy > 2.7, 'Polyploid', Class)) %>% 
   select(id, Class, chr, proj, loss, chr_somy) 
 
 mit_arm_losses_tojoin <- mit_arm_losses %>% 
-  mutate(Class = ifelse(ploidy > 2.7, 'WGD-high', Class)) %>% #ugh this is a fucking mess
+  mutate(Class = ifelse(ploidy > 2.7, 'Polyploid', Class)) %>% 
   select(id, Class, chr, proj, loss, chr_arm) 
 
 tcga_arm_losses <- fa %>% 

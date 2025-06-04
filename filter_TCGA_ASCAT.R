@@ -78,8 +78,8 @@ tcga_classes <- tcga_losses %>%
   left_join(ascat_medicc[, c('sample', 'WGD_status')], by = c('GDC_Aliquot' = 'sample')) %>% 
   mutate(wgd = WGD_status) %>%
   mutate(Class = ifelse(group != 'Other', group, 
-                        ifelse(wgd == 'WGD', 'WGD-high', 
-                               ifelse(ploidy >= 1.9 & ploidy <= 2.1, 'Near-Diploid', 'Other')))) %>% #create 5 ploidy classes
+                        ifelse(wgd == 'WGD', 'Polyploid', 
+                               ifelse(ploidy >= 1.9 & ploidy <= 2.1, 'Diploid', 'Aneuploid')))) %>% #create 5 ploidy classes
   ungroup() %>%
   filter(n_chr_nosex >= 22, min_chr_nosex >= 22) %>%
   left_join(codes[, c('portions.analytes.aliquots.aliquot_id', 'Patient')], by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) #all accounted for

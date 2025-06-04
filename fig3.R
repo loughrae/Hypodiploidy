@@ -25,7 +25,7 @@ mit_wgd_rate <- mitcn_meta %>%
   mutate(high_wgd_clone = ifelse(ploidy > 2.7, "WGD", "Not WGD")) %>%
   group_by(case_id) %>%
   mutate(any_wgd = sum(high_wgd_clone == "WGD" | case_id %in% wgd_cases | case_id %in% rescues)) %>%
-  mutate(any_group = ifelse(sum(group == "Near-Haploid") > 0, "Near-Haploid", ifelse(sum(group == "Low-Hypodiploid") > 0, "Low-Hypodiploid", "Other"))) %>%
+  mutate(any_group = ifelse(sum(group == "Near-Haploid") > 0, "Near-Haploid", ifelse(sum(group == "Low-Hypodiploid") > 0, "Low-Hypodiploid", "Aneuploid"))) %>%
   distinct(case_id, .keep_all = T) %>%
   mutate(wgd = ifelse(any_wgd > 0, "WGD", "No WGD")) %>%
   mutate(any_group = ifelse(any_group == "Near-Haploid", "NH", ifelse(any_group == "Low-Hypodiploid", "LH", any_group))) %>%
@@ -66,7 +66,7 @@ tcga_cnh <- tcga_classes %>%
 
 ## fig3e: CNH by ploidy class (violins)
 cnh_violins <- tcga_cnh %>%
-  mutate(Class = factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Near-Diploid", "Other", "WGD-high"))) %>%
+  mutate(Class = factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Diploid", "Aneuploid", "Polyploid"))) %>%
   ggplot(aes(x = Class, y = CNH)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
@@ -80,7 +80,7 @@ cnh_violins <- tcga_cnh %>%
 hypo_cnh_CI <- tcga_cnh %>%
   filter(!proj %in% c("KICH", "ACC")) %>%
   group_by(proj) %>%
-  summarise(wgd_rate = sum(wgd == "WGD") / n(), hypo_rate = mean(group == "Low-Hypodiploid"), median_cnh = median(CNH[Class %in% c("Near-Diploid", "Other")])) %>%
+  summarise(wgd_rate = sum(wgd == "WGD") / n(), hypo_rate = mean(group == "Low-Hypodiploid"), median_cnh = median(CNH[Class %in% c("Diploid", "Aneuploid")])) %>%
   ggplot(aes(x = hypo_rate, y = median_cnh)) +
   geom_point() +
   geom_smooth(size = 1, method = "lm", colour = "black", fill = "lightsteelblue") +
@@ -95,7 +95,7 @@ segs_violins <- fasc %>%
   mutate(len = (as.numeric(End) + 1) - as.numeric(Start)) %>%
   group_by(proj, GDC_Aliquot, Class, wgd, group) %>%
   summarize(num_segments = n(), prop_max = max(len) / sum(len)) %>%
-  mutate(Class = factor(Class, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Near-Diploid', 'Other', 'WGD-high'))) %>%
+  mutate(Class = factor(Class, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Diploid', 'Aneuploid', 'Polyploid'))) %>%
   ggplot(aes(x = Class, y = num_segments)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
@@ -112,7 +112,7 @@ hypo_segs_CI <- fasc %>%
   summarize(num_segments = n()) %>%
   filter(!proj %in% c("KICH", "ACC")) %>%
   group_by(proj) %>%
-  summarize(wgd_rate = sum(wgd == "WGD") / n(), hypo_rate = mean(group == "Low-Hypodiploid"), median_nseg_sample_normalploidy = median(num_segments[Class %in% c("Near-Diploid", "Other")])) %>%
+  summarize(wgd_rate = sum(wgd == "WGD") / n(), hypo_rate = mean(group == "Low-Hypodiploid"), median_nseg_sample_normalploidy = median(num_segments[Class %in% c("Diploid", "Aneuploid")])) %>%
   ggplot(aes(x = hypo_rate, y = median_nseg_sample_normalploidy)) +
   geom_point() +
   geom_smooth(size = 1, method = "lm", colour = "black", fill = 'lightsteelblue') +
@@ -143,7 +143,7 @@ forsurv <- tcga_classes %>%
   mutate(last = case_when(vital_status == 'Dead' ~ days_to_death, vital_status == 'Alive' ~    days_to_last_follow_up)) %>%
   filter(!is.na(last)) %>%
   mutate(code = case_when(vital_status == 'Dead' ~ 2, vital_status == 'Alive' ~ 1)) %>%
-  mutate(Class = factor(Class, levels = c('Near-Diploid', 'Near-Haploid', 'Low-Hypodiploid', 'Other', 'WGD-high'))) 
+  mutate(Class = factor(Class, levels = c('Diploid', 'Near-Haploid', 'Low-Hypodiploid', 'Aneuploid', 'Polyploid'))) 
 
 
 hypo_effect <- survfit(Surv(last, code) ~ Class, data = forsurv)

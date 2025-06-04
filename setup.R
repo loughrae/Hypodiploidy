@@ -78,13 +78,13 @@ theme_large_classic <- function(base_size = 18, base_family = "") {
 class_palette <- c(
   "Near-Haploid" = "#1b9e77", 
   "Low-Hypodiploid"    = "#66c2a5", 
-  "WGD-high"       = "#3288bd", 
-  "Other"           = "#a6bddb" ,  
-  "Near-Diploid" = 'lightblue'
+  "Polyploid"       = "#3288bd", 
+  "Aneuploid"           = "#a6bddb" ,  
+  "Diploid" = 'lightblue'
 )
 
 pairwise_comparisons <- list(
-  c("Near-Diploid", "WGD-high"),
-  c("Near-Diploid", "Low-Hypodiploid"),
-  c("WGD-high", "Low-Hypodiploid")
+  c("Diploid", "Polyploid"),
+  c("Diploid", "Low-Hypodiploid"),
+  c("Polyploid", "Low-Hypodiploid")
 )

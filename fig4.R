@@ -19,7 +19,7 @@ tcga_mu <- mafs %>%
   ungroup() 
 
 mu_perploidy_reg <- tcga_mu %>%
-  filter(Class %in% c("Near-Diploid", "Low-Hypodiploid")) %>%
+  filter(Class %in% c("Diploid", "Low-Hypodiploid")) %>%
   mutate(mu_per_ploidy = total_mu / ploidy) %>%
   ungroup() %>%
   do(tidy(lm(mu_per_ploidy ~ Class + proj, data = .))) # near diploids have higher mutations_per_ploidy after controlling for cancer type
@@ -41,16 +41,16 @@ status <- tcga_mu %>%
   pivot_longer(-c(Patient, total_mu, total_non_syn_mu, proj, Class), names_to = "gene", values_to = "mutated", values_drop_na = F) #NB: the mutate across above is necessary for this to work
 
 mu_lh <- status %>%
-  filter(Class %in% c("Near-Diploid", "Low-Hypodiploid")) %>%
-  mutate(Class = factor(Class, levels = c('Near-Diploid', 'Low-Hypodiploid'))) %>%
+  filter(Class %in% c("Diploid", "Low-Hypodiploid")) %>%
+  mutate(Class = factor(Class, levels = c('Diploid', 'Low-Hypodiploid'))) %>%
   group_by(gene) %>%
   mutate(n_mutated = sum(mutated == 1)) %>%
   filter(n_mutated >= 5) %>%
   do(tidy(glm(mutated ~ Class + total_non_syn_mu + proj, family = 'binomial', data = .))) %>% ungroup()
 
 mu_poly <- status %>%
-  filter(Class %in% c("Near-Diploid", "WGD-high")) %>%
-  mutate(Class = factor(Class, levels = c('Near-Diploid', 'WGD-high'))) %>%
+  filter(Class %in% c("Diploid", "Polyploid")) %>%
+  mutate(Class = factor(Class, levels = c('Diploid', 'Polyploid'))) %>%
   group_by(gene) %>%
   mutate(n_mutated = sum(mutated == 1)) %>%
   filter(n_mutated >= 5) %>%
@@ -79,7 +79,7 @@ lh_volcano <- mu_lh %>%
 lh_v_poly_mus <- mu_lh %>%
   filter(term == "ClassLow-Hypodiploid") %>%
   left_join(mu_poly, by = c("gene"), suffix = c("_lh", "_poly")) %>%
-  filter(term_poly == "ClassWGD-high") %>%
+  filter(term_poly == "ClassPolyploid") %>%
   mutate(bh_lh = p.adjust(p.value_lh, method = "BH"), bh_poly = p.adjust(p.value_poly, method = "BH")) %>%
   filter(estimate_lh > -15) %>%
   mutate(colour_ind = ifelse(bh_lh < 0.05 & bh_poly < 0.05, "Both", ifelse(bh_lh < 0.05, "Hypo only", ifelse(bh_poly < 0.05, "Polyploids", ifelse(bh_lh >= 0.05 & bh_poly >= 0.05, "n.s.", "what"))))) %>%
@@ -102,8 +102,8 @@ p53_barchart <- mafs %>%
   summarize(p53 = sum(Hugo_Symbol == "TP53" & Variant_Classification != 'Silent')) %>%
   group_by(Class) %>%
   mutate(perc_p53 = sum(p53 > 0) / n()) %>%
-  mutate(Class = ifelse(Class == "Low-Hypodiploid", "LH", ifelse(Class == "Near-Haploid", "NH", ifelse(Class == "WGD-high", "Polyploid", Class)))) %>%
-  mutate(Class = factor(Class, levels = c("NH", "LH", "Near-Diploid", "Other", "Polyploid"))) %>%
+  mutate(Class = ifelse(Class == "Low-Hypodiploid", "LH", ifelse(Class == "Near-Haploid", "NH", Class))) %>%
+  mutate(Class = factor(Class, levels = c("NH", "LH", "Diploid", "Aneuploid", "Polyploid"))) %>%
   ggplot(aes(x = Class, fill = p53 > 0)) +
   geom_bar(position = "fill") +
   xlab("") +
@@ -121,9 +121,9 @@ msi_proc <- tcga_classes %>%
   filter(!is.na(mantis_score)) %>%
   filter(proj %in% c("UCEC", "COAD", "STAD", "ACC")) %>%
   mutate(proj = factor(proj, levels = c("COAD", "UCEC", "STAD", "ACC"))) %>%
-  filter(Class %in% c("Near-Diploid", "Low-Hypodiploid")) %>%
-  mutate(Class = factor(Class, levels = c("Near-Diploid", "Low-Hypodiploid"))) %>%
-  mutate(Class = ifelse(Class == "Near-Diploid", "Dip", "LH")) 
+  filter(Class %in% c("Diploid", "Low-Hypodiploid")) %>%
+  mutate(Class = factor(Class, levels = c("Diploid", "Low-Hypodiploid"))) %>%
+  mutate(Class = ifelse(Class == "Diploid", "Dip", "LH")) 
 
 msi_bar <- msi_proc %>%
   ggplot(aes(x = Class, fill = mantis_score > 0.4)) +
@@ -164,7 +164,7 @@ hypo_v_ragnum <- hyp %>% group_by(proj) %>%
 bts <- 12
 
 hyp_violins <- hyp %>% 
-  mutate(Class = factor(Class, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Near-Diploid', 'Other', 'WGD-high'))) %>%
+  mutate(Class = factor(Class, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Diploid', 'Aneuploid', 'Polyploid'))) %>%
   ggplot(aes(x = Class, y = Ragnum_hypoxia_score_pan_cancer)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
@@ -186,20 +186,20 @@ hyp_ploidy <- hyp %>% ggplot(aes(x = ploidy, y = Ragnum_hypoxia_score_pan_cancer
 
 a1 <- hyp %>%
   group_by(proj) %>%
-  mutate(wgd_rate = sum(wgd == "WGD") / n(), poly_rate = sum(Class == "WGD-high") / n(), hypo_rate = sum(Class == "Low-Hypodiploid") / n()) %>%
+  mutate(wgd_rate = sum(wgd == "WGD") / n(), poly_rate = sum(Class == "Polyploid") / n(), hypo_rate = sum(Class == "Low-Hypodiploid") / n()) %>%
   ungroup() %>%
   pivot_longer(cols = Buffa_hypoxia_score_pan_cancer:Seigneuric2_hypoxia_score_pan_cancer, names_to = "Score", values_to = "Hypoxia") %>%
   group_by(Score, proj, wgd_rate, poly_rate, hypo_rate) %>%
-  summarize(avg_hypoxia = median(Hypoxia), avg_hyp_nonpoly = median(Hypoxia[Class != "WGD-high"]), avg_hyp_nowgd = median(Hypoxia[wgd == "No WGD"]), avg_hyp_nonhypo = median(Hypoxia[Class != "Low-Hypodiploid"])) %>%
+  summarize(avg_hypoxia = median(Hypoxia), avg_hyp_nonpoly = median(Hypoxia[Class != "Polyploid"]), avg_hyp_nowgd = median(Hypoxia[wgd == "No WGD"]), avg_hyp_nonhypo = median(Hypoxia[Class != "Low-Hypodiploid"])) %>%
   pivot_longer(avg_hypoxia:avg_hyp_nonhypo, names_to = "condition", values_to = "hypoxia")
 
 a2 <- hyp %>%
   group_by(proj) %>%
-  mutate(wgd_rate = sum(wgd == "WGD") / n(), poly_rate = sum(Class == "WGD-high") / n(), hypo_rate = sum(Class == "Low-Hypodiploid") / n()) %>%
+  mutate(wgd_rate = sum(wgd == "WGD") / n(), poly_rate = sum(Class == "Polyploid") / n(), hypo_rate = sum(Class == "Low-Hypodiploid") / n()) %>%
   ungroup() %>%
   pivot_longer(cols = Buffa_hypoxia_score_pan_cancer:Seigneuric2_hypoxia_score_pan_cancer, names_to = "Score", values_to = "Hypoxia") %>%
   group_by(Score, proj, wgd_rate, poly_rate, hypo_rate) %>%
-  summarize(avg_hypoxia = median(Hypoxia), avg_hyp_nonpoly = median(Hypoxia[Class != "WGD-high"]), avg_hyp_nowgd = median(Hypoxia[wgd == "No WGD"]), avg_hyp_nonhypo = median(Hypoxia[Class != "Low-Hypodiploid"])) %>%
+  summarize(avg_hypoxia = median(Hypoxia), avg_hyp_nonpoly = median(Hypoxia[Class != "Polyploid"]), avg_hyp_nowgd = median(Hypoxia[wgd == "No WGD"]), avg_hyp_nonhypo = median(Hypoxia[Class != "Low-Hypodiploid"])) %>%
   pivot_longer(wgd_rate:hypo_rate, names_to = "ploidy_rate", values_to = "rate")
 
 diffs <- a1 %>%
@@ -234,10 +234,9 @@ vities <- activities %>%
   filter(!is.na(Class)) %>%
   left_join(clin, by = c('Patient' = 'submitter_id')) %>% 
   filter(!is.na(age_at_index)) %>%
-  mutate(polyploidy = Class == 'WGD-high', hypo = Class == 'Low') %>% 
+  mutate(polyploidy = Class == 'Polyploid', hypo = Class == 'Low') %>% 
   left_join(tcga_mu, by = c('Patient', 'proj', 'Class')) %>% 
   filter(!is.na(total_mu)) %>%
-  mutate(polyploidy = Class == 'WGD-high', hypo = Class == 'Low') %>% 
   pivot_longer(SBS1:SBS99, names_to = 'Signature', values_to = 'Activity')
 
 
@@ -250,7 +249,7 @@ sig_poly_pan <- vities %>%
 
 sig_hypo_pan <- vities %>%
   group_by(Signature) %>%
-  do(tidy(glm(hypo ~ Activity + age + total_mu + proj, family = "binomial", data = .))) %>%
+  do(tidy(glm(hypo ~ Activity + age_at_index + total_mu + proj, family = "binomial", data = .))) %>%
   filter(term == "Activity") %>%
   ungroup() %>%
   mutate(bh = p.adjust(p.value, method = "BH"))
