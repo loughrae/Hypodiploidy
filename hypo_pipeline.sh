@@ -7,7 +7,7 @@ Rscript run_cytoconverter_mitALL.R
 Rscript prep_cytoconverter_output.R
 rm all_mit/*.bed
 bash handle_mit_diploids.sh mit_diploids.tsv all_mit #create a pseudo CN change for the diploid cases
-bash convert_cyto.sh all_cytoconverted.bed all_mit all_mitelman_CNs.bed #why is stuff being partitioned here??????
+bash convert_cyto.sh all_cytoconverted.bed all_mit all_mitelman_CNs.bed 
 Rscript process_mitelman_cns.R #this outputs mitcn_all_for_arms.bed, mitcn_prep.tsv, mitcn_meta.tsv and mitALL_preMEDICC.bed 
 
 ## Run MEDICC on multi-clone ALL samples with at least one LH or NH clone to make WGD calls

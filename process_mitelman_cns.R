@@ -13,9 +13,8 @@ mitcn <- fread('all_mitelman_CNs.bed', header = F) %>%
   mutate(patient_id = paste(Ref, Case, sep = '-')) %>%
   mutate(case_id = paste(Ref, Case, Sample, sep = '-')) %>%
   left_join(mit_meta, by = c('id')) %>%
-  mutate(base_somy = ifelse(Sex == 'M' & chr %in% c('chrX', 'chrY'), 1, 2)) %>%  #deal with sex chromosomes
-  mutate(CN = ifelse(netCN == -999, base_somy, base_somy + netCN)) %>%
-  mutate(CN = ifelse(Y == F & chr == 'chrY', 0, CN)) %>% #sometimes Y is just not mentioned because CC doesn't know it's not supposed to be missing. also female Ys will have been set to 2 before so this should ajdust them back down to 0. be careful though, bit fragile.
+  filter(!chr %in% c('chrX', 'chrY')) %>%
+  mutate(CN = ifelse(netCN == -999, 2, 2 + netCN)) %>%
   group_by(id) %>%
   mutate(neg_CN = sum(CN < 0)) %>%
   filter(neg_CN == 0) %>%
@@ -32,7 +31,7 @@ contrasting_alterations <- mitcn %>%
   pull(id) %>%
   unique()
 
-mitcn_pre <- mitcn %>% 
+mitcn_prep <- mitcn %>% 
   group_by(patient_id) %>%
   mutate(samples_per_patient = n_distinct(Inv)) %>%
   filter(samples_per_patient == 1) %>%
@@ -45,19 +44,16 @@ mitcn_pre <- mitcn %>%
   mutate(chr_ploidy = sum(CN*len)/sum(len)) %>% 
   mutate(chr_somy = round(chr_ploidy, 0)) %>% 
   group_by(id, case_id) %>%
-  mutate(n_chr = sum(chr_somy), n_chr_nosex = sum(chr_somy[!chr %in% c('chrX', 'chrY')])) %>% 
+  mutate(n_chr_nosex = sum(chr_somy)) %>% 
   mutate(group = ifelse(n_chr_nosex < 28, 'Near-Haploid', ifelse(n_chr_nosex < hypo_threshold, 'Low-Hypodiploid', ifelse(n_chr_nosex >= 49 & n_chr_nosex <= 65, 'Hyperdiploid', 'Other')))) %>%
   mutate(dipl = id %in% mit_dips) %>%
   group_by(case_id) %>%
   mutate(any_lows = n_distinct(id[group %in% c('Near-Haploid', 'Low-Hypodiploid')])) %>%
   mutate(any_hyper = n_distinct(id[group == 'Hyperdiploid'])) %>%
   mutate(n_clones = n_distinct(id)) %>%
-  ungroup()
-
-mitcn_prep <- mitcn_pre %>% 
-  filter(!chr %in% c('chrX', 'chrY')) %>% 
   group_by(id) %>%
-  mutate(ploidy = sum(CN*len)/sum(len)) %>% ungroup()
+  mutate(ploidy = sum(CN*len)/sum(len)) %>%
+  ungroup()
 
 mitcn_prep %>% fwrite('mitcn_prep.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
 
@@ -67,7 +63,7 @@ mitcn_prep %>%
 
 mitcn_meta <- mitcn_prep %>%
   distinct(id, .keep_all = T) %>%
-  select(id, case_id, Subclone, n_chr, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl)
+  select(id, case_id, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl)
 
 mitcn_meta %>% fwrite('mitcn_meta.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
 

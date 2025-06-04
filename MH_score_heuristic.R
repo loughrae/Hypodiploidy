@@ -29,7 +29,7 @@ med_single_ids <- med %>%
 
 ## Calculate MH score for mit
 scores_mit <- mitcn_prep %>%
-  group_by(id, case_id, group, chr, chr_len, CN) %>%
+  group_by(id, case_id, group, chr, chr_len, CN, patient_id, Ref, Case) %>%
   summarize(len_cn = sum(len)) %>%
   mutate(frac_cn = len_cn / chr_len) %>%
   group_by(id, case_id, group) %>%

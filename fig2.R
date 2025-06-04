@@ -22,14 +22,14 @@ enough_lh <- tcga_classes %>% filter(group == 'Low-Hypodiploid') %>% count(proj)
 print('Making Figure 2')
 
 mit_arm_losses <- mit_arms %>%
-  group_by(id, case_id, Sex, Subclone, n_chr, group, any_lows, any_hyper, n_clones, chr, chr_arm, ploidy) %>%  
+  group_by(id, case_id, Sex, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr, chr_arm, ploidy) %>%  
   summarize(arm_somy = round(sum(CN*len)/sum(len),0), loss_perc = sum(len[CN < 2])/sum(len)) %>%
   mutate(loss = ifelse(loss_perc > 0.9, 'Lost', 'Retained')) %>%
   mutate(Class = group, proj = 'ALL') %>%
   ungroup() 
 
 mit_chr_losses <- mitcn_prep %>%
-  group_by(id, case_id, Sex, Subclone, n_chr, group, any_lows, any_hyper, n_clones, chr, ploidy) %>%  
+  group_by(id, case_id, Sex, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr, ploidy) %>%  
   summarize(chr_somy = round(sum(CN*len)/sum(len),0), loss_perc = sum(len[CN < 2])/sum(len)) %>%
   mutate(loss = ifelse(loss_perc > 0.9, 'Lost', 'Retained')) %>%
   mutate(Class = group, proj = 'ALL') %>%

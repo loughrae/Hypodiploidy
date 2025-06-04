@@ -6,7 +6,6 @@ select <- dplyr::select
 mit_for_cc <- fread('bq-results-20230925-210156-1695675751704/bq-results-20230925-210156-1695675751704.csv', sep = ',') %>%
   mutate(Inv = paste(RefNo, CaseNo, InvNo, sep = '-')) %>% #sample ID
   mutate(Karyotype = ifelse(KaryLong == '', KaryShort, KaryLong)) %>%
-  filter(Sex %in% c('F', 'M')) %>% 
   select(Inv, Karyotype)
 
 setwd('./CytoConverter')

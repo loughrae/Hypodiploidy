@@ -26,12 +26,13 @@ mit_meta %>% fwrite('mit_meta.tsv', sep = '\t', quote = F, col.names = T, row.na
 
 ## filter cytoconverter output to remove clones with errors, zero-length segments, and samples with ranges, and change Gain to +1 and Loss to -1
 cc_errors <- read.table('cytoconverter_errorlog.tsv', header = T, sep = '\t')
+
 all_cc <- read.table('cytoconverter_result.tsv', sep = '\t', header = T) %>% 
   clean_names() %>%
   separate(sample_id, into = c('Ref', 'Case', 'Sample'), sep = '-', remove = F) %>% 
   separate(Sample, into = c('Sam', 'Subclone'), sep = '_') %>% 
   mutate(Inv = paste(Ref, Case, Sam, sep = '-')) %>%
-  filter(!sample_id %in% cc_errors$Sample.ID) %>% #so including ones where one of the clones had an issue? hmmm...
+  filter(!sample_id %in% cc_errors$Sample.ID) %>% #sample ID from cytoconverter is actually a clone ID
   filter(!Inv %in% range_samples) %>%
   mutate(change = ifelse(type == 'Gain', 1, -1)) %>%
   filter(start != end) 
@@ -41,5 +42,9 @@ all_cc %>%
   arrange(chr, start, end) %>%
   write.table('all_cytoconverted.bed', sep = '\t', col.names = F, row.names = F, quote = F)
 
-mit_dips <- mit_all %>% mutate(pluses = str_count(Karyotype, '\\+')) %>% filter(!id %in% all_cc$sample_id, !id %in% cc_errors$Sample.ID, First == 46, pluses == 0) %>% pull(id)
+mit_dips <- mit_all %>%
+  mutate(questions = str_count(Karyotype, "\\?"), pluses = str_count(Karyotype, "\\+")) %>%
+  filter(questions == 0, !id %in% all_cc$sample_id, !id %in% cc_errors$Sample.ID, First == 46, pluses == 0) %>% #the questions part is only really necessary if you do any filtering before running cytoconverter (e.g. requiring sex info)
+  pull(id)
+
 mit_dips %>% write.table(file = 'mit_diploids.tsv', sep = '\t', quote = F, row.names = F, col.names = F)
