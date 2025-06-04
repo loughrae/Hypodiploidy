@@ -45,7 +45,6 @@ mit_arm_losses_tojoin <- mit_arm_losses %>%
 
 tcga_arm_losses <- fa %>% 
   mutate(len = (end - start) + 1) %>%
-  filter(!chr %in% c('chrX', 'chrY')) %>% 
   mutate(loh_indicator = ifelse(mCN == 0, 1, 0)) %>%
   mutate(prod = CN*len, loh_len = loh_indicator*len) %>%
   group_by(GDC_Aliquot, proj) %>%
@@ -72,13 +71,11 @@ joint_arm_losses <- tcga_arm_losses %>%
 
 chr_loss_rates_pan_lowhypo <- joint_chr_losses %>%
   filter(Class == 'Low-Hypodiploid') %>%
-  filter(!chr %in% c('chrX', 'chrY')) %>%
   group_by(chr) %>%
   summarize(loss_rate = mean(loss == 'Lost'))
 
 arm_loss_rates_pan_lowhypo <- joint_arm_losses %>%
   filter(Class == 'Low-Hypodiploid') %>%
-  filter(!chr %in% c('chrX', 'chrY')) %>%
   group_by(chr_arm) %>%
   summarize(loss_rate = mean(loss == 'Lost'))
 

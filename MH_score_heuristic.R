@@ -88,7 +88,6 @@ hyper_rescues <- scores_mit %>%
 
 tcga_scores <- fasc %>% 
   mutate(len = (End - Start) + 1) %>%
-  filter(!Chromosome %in% c('chrX', 'chrY')) %>%
   filter(GDC_Aliquot %in% tcga_classes$GDC_Aliquot) %>% 
   group_by(GDC_Aliquot, Chromosome) %>% 
   mutate(chr_len = sum(len)) %>% 
