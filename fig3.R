@@ -7,8 +7,7 @@ tcga_classes <- fread('TCGA_ploidy_classes.tsv')
 
 fasc <- fread("filtered_ascat.tsv") %>%
   filter(GDC_Aliquot %in% tcga_classes$GDC_Aliquot) %>%
-  left_join(tcga_classes, by = c("GDC_Aliquot", "proj")) %>%
-  filter(!Chromosome %in% c("chrX", "chrY"))
+  left_join(tcga_classes, by = c("GDC_Aliquot", "proj")) 
 
 mitcn_meta <- fread('mitcn_meta.tsv') 
 

@@ -41,13 +41,14 @@ filtered_codes <- codes %>%
   left_join(meta, by = c('Patient')) %>%
   distinct(Patient, .keep_all = TRUE)  
 
-filtered_ascat <- ascat %>% #note keeping sex chromosomes
+filtered_ascat <- ascat %>% #removing sex chromosomes here
   filter(GDC_Aliquot %in% filtered_codes$portions.analytes.aliquots.aliquot_id) %>% #keep only preferred samples
   mutate_at(c('Start', 'End', 'Copy_Number', 'Major_Copy_Number', 'Minor_Copy_Number'), as.numeric)  %>% #convert these columns to numeric
   left_join(filtered_codes, by = c('GDC_Aliquot' = 'portions.analytes.aliquots.aliquot_id')) %>% #get barcodes 
   separate(project, into = c('tcga', 'proj'), sep = '-', remove = F) %>%
   mutate_at(c('Start', 'End', 'Minor_Copy_Number', 'Major_Copy_Number', 'Copy_Number'), as.numeric) %>%
-  select(Chromosome, Start, End, GDC_Aliquot, Copy_Number, Minor_Copy_Number, proj)
+  select(Chromosome, Start, End, GDC_Aliquot, Copy_Number, Minor_Copy_Number, proj) %>%
+  filter(!Chromosome %in% c('chrX', 'chrY'))
 
 filtered_ascat %>% fwrite('filtered_ascat.tsv', sep = '\t', quote = F, col.names = T, row.names = F)
 
@@ -59,7 +60,6 @@ filtered_ascat %>%
 tcga_losses <- filtered_ascat %>% 
   mutate(len = (End - Start) + 1) %>%
   rename(CN = Copy_Number, mCN = Minor_Copy_Number, chr = Chromosome, start = Start, end = End) %>%
-  filter(!chr %in% c('chrX', 'chrY')) %>% #just get rid of them
   mutate(loh_indicator = ifelse(mCN == 0, 1, 0)) %>%
   mutate(prod = CN*len, loh_len = loh_indicator*len) %>%
   group_by(GDC_Aliquot, proj) %>%
