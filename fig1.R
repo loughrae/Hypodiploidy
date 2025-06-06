@@ -223,3 +223,114 @@ false_neg_viz <- mitcn_prep %>%
 figs1 <- (rare_tetra | tcga_overlap) / (tcga_heuristic_accuracy_plot | false_neg_viz)
 ggsave(plot = figs1, file =  'paper/paper_suppfig1_2025.png', width = 25, height = 25)
 ggsave(plot = figs1, file = 'paper/paper_suppfig1_2025.pdf', width = 25, height = 25)
+
+## Stats in text ##
+
+# number of ALL patients
+mitcn_meta %>% distinct(case_id) %>% nrow() #6907
+# number of hypodiploid clones
+mitcn_meta %>% filter(group %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% nrow() #305
+# number of patients with hypodiploid clones
+mitcn_meta %>% filter(group %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% distinct(case_id) %>% nrow() #294
+# Mit LH v NH split
+mitcn_meta %>% count(group) #163 NH, 142 LH
+# proportion of hypodiploids between the two modes (Mit)
+mitcn_meta %>% filter(group %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% count(n_chr_nosex >= 28 & n_chr_nosex <= 31) #0.052
+# lowest chr count 
+mitcn_meta %>% summarize(min(n_chr_nosex))
+mitcn_prep %>% filter(n_chr_nosex == 23) %>% filter(chr_somy != 1) %>% count(chr)
+# number of TCGA current v former hypodiploids (note: some Aneuploid cases have n_chr_nosex < hypo_threshold but not enough LOH...)
+tcga_classes %>% filter(group != 'Other') %>% count(n_chr_nosex < hypo_threshold)
+# LH v NH ratio (TCGA)
+tcga_classes %>% filter(group != 'Other') %>% count(Class) %>% mutate(prop = n/sum(n))
+# LH frequency by cancer type
+tcga_classes %>% group_by(proj) %>% summarize(tot = n(), n_lh = sum(Class == 'Low-Hypodiploid'), prop_lh = n_lh/tot) %>% arrange(desc(prop_lh))
+tcga_classes %>% group_by(proj) %>% summarize(tot = n(), n_lh = sum(Class == 'Low-Hypodiploid'), prop_lh = n_lh/tot) %>% arrange(desc(prop_lh)) %>% filter(n_lh >= 5)
+# NH frequency by cancer type 
+tcga_classes %>% group_by(proj) %>% summarize(tot = n(), n_nh = sum(Class == 'Near-Haploid'), prop_nh = n_nh/tot) %>% arrange(desc(prop_nh)) %>% filter(n_nh > 0)
+tcga_classes %>% filter(Class == 'Near-Haploid') %>% count(wgd)
+tcga_classes %>% filter(Class == 'Near-Haploid') %>% pull(n_chr_nosex) %>% summary()
+
+# number of cases analysed by MEDICC
+nrow(med) #148
+nrow(true_pos) #125
+nrow(heh) #577
+true_pos %>% summarise(median(n_3)) #0
+heh %>% summarize(median(n_3)) #6
+
+#false-negs
+mh_ids <- true_pos %>% pull(case_id) %>% unique()
+mitcn_meta %>% filter(case_id %in% mh_ids) %>% count(group) #LHs make up 36% of hypos in the test set
+mitcn_meta %>% filter(case_id %in% false_neg_ids) %>% count(group) #but 66% of false negs
+true_pos %>% filter(diff <= 0) %>% summarize(median(diff))
+true_pos %>% filter(diff <= 0) %>% summarize(median(n_3))
+#sensitivity in the hyperdiploid range
+true_pos %>% filter(group == 'Hyperdiploid') %>% count(diff > 0)
+#rescues
+NROW(rescues)
+NROW(hyper_rescues)
+mitcn_meta %>% filter(case_id %in% rescues) %>% filter(n_clones > 1) #one subclonal
+coexisting <- mitcn_meta %>% distinct(case_id, .keep_all = T) %>% filter(any_lows > 0, n_clones > any_lows) %>% mutate(doubled = case_id %in% wgd_cases) # coexisting: 141
+exclusive_hypo <- mitcn_meta %>% distinct(case_id, .keep_all = T) %>% filter(any_lows == n_clones)  #153
+mitcn_meta %>% filter(case_id %in% rescues) %>% distinct(case_id) #17
+#total hypodiploids: 
+nrow(exclusive_hypo) + nrow(coexisting) + NROW(rescues)
+#using 37 threshold:
+
+
+heh_spec <- heh_aut %>%
+  group_by(chrs) %>%
+  mutate(id = row_number()) %>%
+  ggplot(aes(x = chrs, y = id, colour = diff <= 0)) +
+  geom_point() +
+  theme_large() +
+  ylab("Case") +
+  labs(colour = "MH score <= 0", subtitle = "Woodward et al (high-hyperdiploid cases, no subclonality, N = 414)", x = "Autosomes") +
+  geom_vline(xintercept = 45.5, colour = "darkred") +
+  geom_vline(xintercept = 78, colour = "darkred") +
+  scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
+  theme(legend.position = "none") +
+  scale_x_continuous(limits = c(45, 89))
+
+target_spec <- target_classes %>%
+  filter(min_chr_nosex >= hypo_threshold) %>%
+  mutate(diff = n_tetrasomic - n_trisomic) %>%
+  filter(n_chr_nosex > 44) %>%
+  group_by(n_chr_nosex) %>%
+  mutate(id = row_number()) %>%
+  ggplot(aes(x = n_chr_nosex, colour = diff <= 0, y = id)) +
+  geom_point() +
+  geom_vline(xintercept = 45.5, colour = "darkred") +
+  geom_vline(xintercept = 78, colour = "darkred") +
+  theme_large() +
+  labs(colour = "MH score <= 0", subtitle = "TARGET (non-hypodiploid cases with > 44 autosomes, N = 67)") +
+  scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
+  ylab("Cases") +
+  xlab("Autosomes") +
+  theme(legend.position = "bottom")
+
+mh <- true_pos %>%
+  group_by(chrs) %>%
+  mutate(id = row_number()) %>%
+  ggplot(aes(x = chrs, y = id, colour = diff <= 0)) +
+  geom_point(size = 2) +
+  theme_large() +
+  ylab("Case") +
+  labs(colour = "Tetrasomies <= Trisomies", subtitle = "Subclonal masked hypodiploids, N = 125", x = "Autosomes") +
+  geom_vline(xintercept = 45.5, colour = "darkred") +
+  geom_vline(xintercept = 76, colour = "darkred") +
+  scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
+  theme(legend.position = "bottom") +
+  scale_x_continuous(limits = c(45, 89))
+
+fully_masked_plot <- scores_mit %>%
+  left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
+  filter(diff > 0, n_chr_nosex < 77, any_lows == 0, n_chr_nosex >= 46) %>%
+  ggplot(aes(x = n_chr_nosex)) +
+  geom_bar(fill = "black") +
+  theme_large() +
+  xlab("Autosomes") +
+  ylab("Inferred Fully-Masked Cases") +
+  ggtitle("Inferred Fully-Masked Cases")
+
+# this bit is actually written for figure 3

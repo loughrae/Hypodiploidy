@@ -1,7 +1,7 @@
 set -euo pipefail
 set -x
 
-Rscript run_cytoconverter_mitALL.R
+#Rscript run_cytoconverter_mitALL.R
 
 ## process cytoconverter results to get Mitelman-ALL copy numbers
 Rscript prep_cytoconverter_output.R
@@ -11,6 +11,7 @@ bash convert_cyto.sh all_cytoconverted.bed all_mit all_mitelman_CNs.bed
 Rscript process_mitelman_cns.R #this outputs mitcn_all_for_arms.bed, mitcn_prep.tsv, mitcn_meta.tsv and mitALL_preMEDICC.bed 
 
 ## Run MEDICC on multi-clone ALL samples with at least one LH or NH clone to make WGD calls
+rm MITMED/*summary.tsv
 bash makemedicc.sh mitALL_preMEDICC.bed mitALL_for_MEDICC mitALL combined_mitALL_forMEDICC.txt
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate medicc_env

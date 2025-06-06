@@ -44,7 +44,8 @@ mitcn_prep <- mitcn %>%
   mutate(chr_ploidy = sum(CN*len)/sum(len)) %>% 
   mutate(chr_somy = round(chr_ploidy, 0)) %>% 
   group_by(id, case_id) %>%
-  mutate(n_chr_nosex = sum(chr_somy)) %>% 
+  mutate(n_chr_nosex = sum(chr_somy), n_nullisomic = sum(chr_somy == 0)) %>% 
+  filter(n_nullisomic == 0, n_chr_nosex >= 22) %>% #there were 9 clones with nullisomies and 0 sub-haploids
   mutate(group = ifelse(n_chr_nosex < 28, 'Near-Haploid', ifelse(n_chr_nosex < hypo_threshold, 'Low-Hypodiploid', ifelse(n_chr_nosex >= 49 & n_chr_nosex <= 65, 'Hyperdiploid', 'Other')))) %>%
   mutate(dipl = id %in% mit_dips) %>%
   group_by(case_id) %>%
@@ -63,7 +64,7 @@ mitcn_prep %>%
 
 mitcn_meta <- mitcn_prep %>%
   distinct(id, .keep_all = T) %>%
-  select(id, case_id, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl)
+  select(id, case_id, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl, n_nullisomic)
 
 mitcn_meta %>% fwrite('mitcn_meta.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
 

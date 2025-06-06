@@ -33,9 +33,6 @@ scores_mit <- mitcn_prep %>%
   summarize(len_cn = sum(len)) %>%
   mutate(frac_cn = len_cn / chr_len) %>%
   group_by(id, case_id, group) %>%
-  filter(frac_cn >= 0.9) %>%
-  mutate(valid_chromosomes = n_distinct(chr)) %>%
-  filter(valid_chromosomes >= 10) %>%
   mutate(CN = paste0("n_", CN), CN = ifelse(CN %in% c("n_1", "n_2", "n_3", "n_4"), CN, "Other")) %>%
   count(id, case_id, group, CN) %>%
   pivot_wider(names_from = CN, values_from = n, values_fill = 0) %>%
@@ -59,10 +56,10 @@ heh <- read.xlsx("Supplementary_data_1_Woodward et al.xlsx", startRow = 2) %>%
   pivot_longer(cols = chr1:chrY, names_to = "Chromosome", values_to = "CN") %>%
   select(Chromosome, Modal.no.including.subclonality, Chromosome, CN, Case.no.) %>%
   filter(!Chromosome %in% c("chrX", "chrY")) %>%
-  filter(CN %in% c("Tri", "Tetra_2_2", "Tetra_3_1")) %>%
+  filter(CN %in% c("Tri", "Tetra_2_2", "Tetra_3_1", 'UPT')) %>%
   count(Case.no., Modal.no.including.subclonality, CN) %>%
   pivot_wider(names_from = CN, values_from = n, values_fill = 0) %>%
-  rename(n_3 = Tri) %>%
+  mutate(n_3 = Tri + UPT) %>%
   mutate(n_4 = Tetra_2_2 + Tetra_3_1) %>%
   mutate(diff = n_4 - n_3) %>%
   mutate(label = "True-Neg")
@@ -75,15 +72,13 @@ heh %>% count(n_3 < 3) # 575 correct, 2 wrong - changes with the nosex sigh.
 heh %>% count(diff > 0) # 576 correct, 1 wrong
 
 rescues <- scores_mit %>%
-  left_join(mitcn_prep, by = c("id", "case_id", "group")) %>%
-  distinct(id, .keep_all = T) %>%
-  filter(diff > 0, n_chr_nosex < 78, any_lows == 0, n_chr_nosex >= 49) %>%
+  left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
+  filter(diff > 0, n_chr_nosex < 78, any_lows == 0, n_chr_nosex >= 46) %>%
   pull(case_id)
 
 hyper_rescues <- scores_mit %>%
-  left_join(mitcn_prep, by = c("id", "case_id", "group")) %>%
-  distinct(id, .keep_all = T) %>%
-  filter(diff > 0, n_chr_nosex < 78, group == "Hyperdiploid", any_lows == 0, n_chr_nosex >= 49) %>%
+  left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
+  filter(diff > 0, group == "Hyperdiploid", any_lows == 0) %>% #49-65
   pull(case_id)
 
 tcga_scores <- fasc %>% 
@@ -95,9 +90,6 @@ tcga_scores <- fasc %>%
   summarize(len_cn = sum(len)) %>%
   mutate(frac_cn = len_cn/chr_len) %>% 
   group_by(GDC_Aliquot) %>% 
-  filter(frac_cn >= 0.9) %>% 
-  mutate(valid_chromosomes = n_distinct(Chromosome)) %>% 
-  filter(valid_chromosomes >= 10) %>%
   mutate(CN = paste0('n_', Copy_Number), CN = ifelse(CN %in% c('n_1', 'n_2', 'n_3', 'n_4'), CN, 'Other')) %>% 
   count(GDC_Aliquot, CN) %>% 
   pivot_wider(names_from = CN, values_from = n, values_fill = 0) %>% 
