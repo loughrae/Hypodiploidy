@@ -443,3 +443,7 @@ degree_aneu %>%
   summarize(loss_rate = mean(loss == "Lost")) %>%
   group_by(losses_group) %>%
   do(tidy(glm(loss_rate ~ sum_p_haplo, data = .))) %>% filter(term == 'sum_p_haplo')
+
+#chr7?
+joint_chr_losses %>% filter(Class == 'Low-Hypodiploid', proj %in% c(enough_lh, 'ALL')) %>% group_by(chr, proj) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr7')
+joint_chr_losses %>% filter(Class %in% c('Low-Hypodiploid', 'Near-Haploid'), proj != 'ALL') %>% group_by(chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% arrange(loss_rate)
