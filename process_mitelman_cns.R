@@ -31,30 +31,49 @@ contrasting_alterations <- mitcn %>%
   pull(id) %>%
   unique()
 
-mitcn_prep <- mitcn %>% 
+
+mitcn_prep <- mitcn %>%
+  filter(!id %in% contrasting_alterations) %>% 
   group_by(patient_id) %>%
   mutate(samples_per_patient = n_distinct(Inv)) %>%
   filter(samples_per_patient == 1) %>%
   ungroup() %>% 
-  filter(!id %in% contrasting_alterations) %>% 
   mutate(len = end - start) %>%
+  group_by(id, case_id) %>%
+  mutate(ploidy = sum(CN*len)/sum(len)) %>%
   group_by(id, case_id, chr) %>% 
   mutate(chr_len = sum(len)) %>%
-  group_by(id, case_id, chr, chr_len) %>%
-  mutate(chr_ploidy = sum(CN*len)/sum(len)) %>% 
+  group_by(id, case_id, chr) %>%
+  mutate(loss_perc = sum(len[CN < 2])/sum(len)) %>%
+  mutate(loss = ifelse(loss_perc > 0.9, 'Lost', 'Retained')) %>%
+  ungroup()
+  
+#chromosome level summary
+mitcn_chr_summary <- mitcn_prep %>%
+  group_by(id, case_id, chr, chr_len, ploidy, Subclone, Sex, loss, loss_perc) %>%
+  summarize(chr_ploidy = sum(CN*len)/sum(len)) %>% 
   mutate(chr_somy = round(chr_ploidy, 0)) %>% 
   group_by(id, case_id) %>%
   mutate(n_chr_nosex = sum(chr_somy), n_nullisomic = sum(chr_somy == 0)) %>% 
-  filter(n_nullisomic == 0, n_chr_nosex >= 22) %>% #there were 9 clones with nullisomies and 0 sub-haploids
+  mutate(n_trisomic = sum(chr_somy == 3), n_tetrasomic = sum(chr_somy == 4), n_disomic = sum(chr_somy == 2)) %>%
+  filter(n_nullisomic == 0, n_chr_nosex >= 22) %>% 
   mutate(group = ifelse(n_chr_nosex < 28, 'Near-Haploid', ifelse(n_chr_nosex < hypo_threshold, 'Low-Hypodiploid', ifelse(n_chr_nosex >= 49 & n_chr_nosex <= 65, 'Hyperdiploid', 'Other')))) %>%
   mutate(dipl = id %in% mit_dips) %>%
   group_by(case_id) %>%
   mutate(any_lows = n_distinct(id[group %in% c('Near-Haploid', 'Low-Hypodiploid')])) %>%
   mutate(any_hyper = n_distinct(id[group == 'Hyperdiploid'])) %>%
-  mutate(n_clones = n_distinct(id)) %>%
-  group_by(id) %>%
-  mutate(ploidy = sum(CN*len)/sum(len)) %>%
+  mutate(n_clones = n_distinct(id)) 
+
+mitcn_chr_summary %>% fwrite('mitcn_chr_summary.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
+
+mitcn_meta <- mitcn_chr_summary %>%
+  distinct(id, .keep_all = T) %>%
+  select(id, case_id, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl, n_nullisomic, n_disomic, n_trisomic, n_tetrasomic) %>%
   ungroup()
+
+mitcn_meta %>% fwrite('mitcn_meta.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
+
+mitcn_prep <- mitcn_prep %>% filter(id %in% mitcn_meta$id)
 
 mitcn_prep %>% fwrite('mitcn_prep.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
 
@@ -62,13 +81,8 @@ mitcn_prep %>%
   select(chr, start, end, id, CN) %>% #no need to do start - 1
   write.table('mitcn_all_for_arms.bed', sep = '\t', quote = F, col.names = F, row.names = F)
 
-mitcn_meta <- mitcn_prep %>%
-  distinct(id, .keep_all = T) %>%
-  select(id, case_id, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr_len, Sex, ploidy, dipl, n_nullisomic)
-
-mitcn_meta %>% fwrite('mitcn_meta.tsv', quote = F, sep = '\t', col.names = T, row.names = F)
-
 mitcn_prep %>%
+  left_join(mitcn_meta, by = c('case_id', 'id')) %>%
   filter(n_clones > 1, any_lows > 0) %>% 
   select(chr, start, end, id, CN, case_id) %>%
   arrange(chr, start, end, id) %>%

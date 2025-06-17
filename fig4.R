@@ -403,18 +403,10 @@ vities <- activities %>%
   filter(!is.na(total_mu)) %>%
   pivot_longer(SBS1:SBS99, names_to = 'Signature', values_to = 'Activity')
 
-
-sig_poly_pan <- vities %>%
-  group_by(Signature) %>%
-  do(tidy(glm(polyploidy ~ Activity + age_at_index + total_mu + proj, family = "binomial", data = .))) %>%
-  filter(term == "Activity") %>%
-  ungroup() %>%
-  mutate(bh = p.adjust(p.value, method = "BH"))
-
 sig_hypo_pan <- vities %>%
   group_by(Signature) %>%
-  do(tidy(glm(hypo ~ Activity + age_at_index + total_mu + proj, family = "binomial", data = .))) %>%
-  filter(term == "Activity") %>%
+  do(tidy(glm(Activity ~ hypo + age_at_index + total_mu + proj, data = .))) %>%
+  filter(term == "hypoTRUE") %>%
   ungroup() %>%
   mutate(bh = p.adjust(p.value, method = "BH"))
 

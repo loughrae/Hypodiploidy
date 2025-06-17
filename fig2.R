@@ -3,7 +3,7 @@ source('setup.R')
 tcga_classes <- fread('TCGA_ploidy_classes.tsv')
 tcga_losses <- fread('tcga_losses.tsv')
 mitcn_meta <- fread('mitcn_meta.tsv')
-mitcn_prep <- fread('mitcn_prep.tsv') 
+mitcn_chr_summary <- fread('mitcn_chr_summary.tsv')
 
 chr_length <- arms %>% group_by(chr) %>% summarize(first = min(st), last = max(en))
 
@@ -48,10 +48,7 @@ mit_arm_losses <- mit_arms %>%
   mutate(Class = group, proj = 'ALL') %>%
   ungroup() 
 
-mit_chr_losses <- mitcn_prep %>%
-  group_by(id, case_id, Sex, Subclone, n_chr_nosex, group, any_lows, any_hyper, n_clones, chr, ploidy) %>%  
-  summarize(chr_somy = round(sum(CN*len)/sum(len), 0), loss_perc = sum(len[CN < 2])/sum(len)) %>%
-  mutate(loss = ifelse(loss_perc > 0.9, 'Lost', 'Retained')) %>%
+mit_chr_losses <- mitcn_chr_summary %>%
   mutate(Class = group, proj = 'ALL') %>%
   ungroup() 
 
@@ -444,6 +441,9 @@ degree_aneu %>%
   group_by(losses_group) %>%
   do(tidy(glm(loss_rate ~ sum_p_haplo, data = .))) %>% filter(term == 'sum_p_haplo')
 
-#chr7?
+#chr7
 joint_chr_losses %>% filter(Class == 'Low-Hypodiploid', proj %in% c(enough_lh, 'ALL')) %>% group_by(chr, proj) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr7')
 joint_chr_losses %>% filter(Class %in% c('Low-Hypodiploid', 'Near-Haploid'), proj != 'ALL') %>% group_by(chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% arrange(loss_rate)
+
+#median loss rates by location 
+hypo_chr_loss_rates %>% group_by(location) %>% summarize(median(loss_rate))

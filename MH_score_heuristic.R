@@ -1,7 +1,9 @@
 source('setup.R')
 fasc <- fread('filtered_ascat.tsv')
-mitcn_prep <- fread('mitcn_prep.tsv')
 tcga_classes <- fread('TCGA_ploidy_classes.tsv')
+mitcn_meta <- fread('mitcn_meta.tsv')
+tcga_losses <- fread('tcga_losses.tsv')
+mitcn_chr_summary <- fread('mitcn_chr_summary.tsv')
 
 print('MH score heuristic')
 
@@ -28,23 +30,15 @@ med_single_ids <- med %>%
   pull(WGD)
 
 ## Calculate MH score for mit
-scores_mit <- mitcn_prep %>%
-  group_by(id, case_id, group, chr, chr_len, CN, patient_id, Ref, Case) %>%
-  summarize(len_cn = sum(len)) %>%
-  mutate(frac_cn = len_cn / chr_len) %>%
-  group_by(id, case_id, group) %>%
-  mutate(CN = paste0("n_", CN), CN = ifelse(CN %in% c("n_1", "n_2", "n_3", "n_4"), CN, "Other")) %>%
-  count(id, case_id, group, CN) %>%
-  pivot_wider(names_from = CN, values_from = n, values_fill = 0) %>%
-  mutate(diff = n_4 - n_3) %>%
-  ungroup()
-
+scores_mit <- mitcn_meta %>%
+  select(id, case_id, group, n_tetrasomic, n_trisomic, n_disomic) %>%
+  mutate(diff = n_tetrasomic - n_trisomic) 
 
 # true positives:
-true_pos <- mitcn_prep %>%
-  select(id, patient_id, case_id, n_clones, any_lows, any_hyper, group, n_chr_nosex) %>%
-  filter(n_clones > 1, any_lows > 0, n_clones > any_lows, n_chr_nosex < 78) %>% # include hyperdiploids and near-triploids
-  distinct(id, .keep_all = T) %>%
+true_pos <- mitcn_meta %>%
+  select(id, case_id, n_clones, any_lows, any_hyper, group, n_chr_nosex) %>%
+  filter(n_clones > 1, any_lows > 0, n_clones > any_lows, n_chr_nosex <= 76) %>% # include hyperdiploids and near-triploids
+  distinct(id, .keep_all = T) %>%                                                                                                                                                                
   filter(id %in% med_single_ids) %>%
   left_join(scores_mit, by = c("id", "case_id", "group")) %>%
   mutate(label = "True-Pos") %>%
@@ -73,24 +67,17 @@ heh %>% count(diff > 0) # 576 correct, 1 wrong
 
 rescues <- scores_mit %>%
   left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
-  filter(diff > 0, n_chr_nosex < 78, any_lows == 0, n_chr_nosex >= 46) %>%
-  pull(case_id)
+  filter(diff > 0, n_chr_nosex <= 76, any_lows == 0, n_chr_nosex >= 46) %>%
+  pull(id)
 
 hyper_rescues <- scores_mit %>%
   left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
   filter(diff > 0, group == "Hyperdiploid", any_lows == 0) %>% #49-65
-  pull(case_id)
+  pull(id)
 
-tcga_scores <- fasc %>% 
-  mutate(len = (End - Start) + 1) %>%
-  filter(GDC_Aliquot %in% tcga_classes$GDC_Aliquot) %>% 
-  group_by(GDC_Aliquot, Chromosome) %>% 
-  mutate(chr_len = sum(len)) %>% 
-  group_by(GDC_Aliquot, Chromosome, chr_len, Copy_Number) %>% 
-  summarize(len_cn = sum(len)) %>%
-  mutate(frac_cn = len_cn/chr_len) %>% 
+tcga_scores <- tcga_losses %>% 
   group_by(GDC_Aliquot) %>% 
-  mutate(CN = paste0('n_', Copy_Number), CN = ifelse(CN %in% c('n_1', 'n_2', 'n_3', 'n_4'), CN, 'Other')) %>% 
+  mutate(CN = paste0('n_', chr_somy), CN = ifelse(CN %in% c('n_1', 'n_2', 'n_3', 'n_4'), CN, 'Other')) %>% 
   count(GDC_Aliquot, CN) %>% 
   pivot_wider(names_from = CN, values_from = n, values_fill = 0) %>% 
   mutate(diff = n_4 - n_3) %>%
