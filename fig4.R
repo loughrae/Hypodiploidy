@@ -462,16 +462,40 @@ tissue_hypoxia <- rag_scores %>% ggplot(aes(x = reorder(proj, ragnum_score_pan, 
   ylab("Ragnum Hypoxia Score") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
   labs(subtitle = '(e)')
-# 
-# figS4 <- (msi_bar / msi_violin_nondoubledhypos)  | (tissue_hypoxia / hyp_violins_nondoubledhypos / diffs)
-# ggsave(plot = figS4, file = 'paper/supp_fig4.png', width = 28, height = 25)
 
-figS4 <- (total_mus_by_class | mu_per_ploidy_by_class) / (msi_bar | msi_violin_nondoubledhypos) / (tissue_hypoxia) / (hyp_violins_nondoubledhypos | diffs)
+#check for replication rate confounding
+
+pi_cpm <- fread('~/PhD/Hypodiploidy/all_PIs.tsv') #sent over from server/transcriptome/
+pis_cpm <- pi_cpm %>% group_by(V3, cancer) %>% summarize(PI_cpm = median(V4))
+
+#hypodiploidy rate is weakly correlated with replication rate (r = 0.36, p = 0.044)
+hypodiploidy_v_PI <- rna_ids %>%
+  left_join(pis_cpm, by = c("file_id" = "V3")) %>%
+  left_join(tcga_classes, by = c("submitter_id" = "Patient")) %>%
+  filter(!is.na(Class)) %>%
+  group_by(proj) %>%
+  summarize(hypo_rate = mean(group == "Low-Hypodiploid"), med_pi_cpm = median(PI_cpm)) %>%
+  filter(!proj %in% c("KICH", "ACC")) %>% #extreme outliers in hypodiploidy rate
+  ggplot(aes(x = med_pi_cpm, y = hypo_rate)) +
+  geom_point() +
+  stat_cor() +
+  geom_smooth(method = "lm") +
+  geom_text_repel(aes(label = proj)) +
+  labs(x = "Median Proliferative Index", y = "Low-hypodiploidy Rate") +
+  theme_large() + 
+  labs(subtitle = '(h)')
+
+#regression against diploid
+rag_scores %>% left_join(rna_ids, by = c('submitter_id')) %>% left_join(pis_cpm, by = c('file_id' = 'V3')) %>% filter(Class %in% c('Low-Hypodiploid', 'Diploid')) %>% do(tidy(glm(ragnum_score_pan ~ Class + PI_cpm, data = .))) 
+#regression against aneuploid
+rag_scores %>% left_join(rna_ids, by = c('submitter_id')) %>% left_join(pis_cpm, by = c('file_id' = 'V3')) %>% do(tidy(glm(ragnum_score_pan ~ Class + PI_cpm, data = .)))
+
+figS4 <- (total_mus_by_class | mu_per_ploidy_by_class) / (msi_bar | msi_violin_nondoubledhypos) / (tissue_hypoxia) / (hyp_violins_nondoubledhypos | diffs | hypodiploidy_v_PI)
 ggsave(plot = figS4, file = 'paper/supp_fig4.png', width = 25, height = 30)
 
-  ## In text ##
-  #hypoxia scores by class
-  rag_scores %>% group_by(Class) %>% summarize(median(ragnum_score_pan))
+## In text ##
+#hypoxia scores by class
+rag_scores %>% group_by(Class) %>% summarize(median(ragnum_score_pan))
 
 # no enriched mutational signatures after multiple testing correction
 sig_hypo_pan %>% filter(bh < 0.05) 
