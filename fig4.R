@@ -291,7 +291,8 @@ pairwise_comparisons <- list(
   c("Diploid", "Polyploid"),
   c("Diploid", "Low-Hypodiploid"),
   c("Polyploid", "Low-Hypodiploid"),
-  c("Aneuploid", "Low-Hypodiploid")
+  c("Aneuploid", "Low-Hypodiploid"),
+  c("Near-Haploid", "Low-Hypodiploid")
 )
 
 hyp_violins <- rag_scores %>% 

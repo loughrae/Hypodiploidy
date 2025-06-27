@@ -56,6 +56,20 @@ hypo_props <- tcga_classes %>%
   theme_large_classic() +
   theme(legend.position = 'bottom') 
 
+class_props <- tcga_classes %>%
+  group_by(proj) %>%
+  mutate(prop_hypo = mean(group != "Other")) %>%
+  mutate(Class = fct_rev(factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Diploid", "Aneuploid", "Polyploid")))) %>%
+  ggplot(aes(x = reorder(proj, prop_hypo), fill = Class)) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = class_palette) +
+  theme_large_classic() +
+  theme(axis.text.y = element_text(size = 12)) +
+  coord_flip() +
+  theme(legend.position = "bottom") +
+  labs(x = "", y = "Proportion of Cases", subtitle = '(b)') +
+  guides(fill = guide_legend(reverse = TRUE))
+
 ##fig1c: masked hypodiploidy visualisation
 viz_ids <- mitcn_meta %>%
   filter(n_clones == 2) %>%
@@ -153,7 +167,7 @@ confusion <- true_pos_reformat %>%
 
 fig1a <- (autosome_count_mit / cts_tcga / (cts_brca | cts_kich) / (cts_acc | cts_sarc))
 
-fig1a / (hypo_props | viz ) / ( scatter | overlap | confusion) + plot_layout(heights = c(1, 1, 1, 1, 2, 2))
+fig1a / (class_props | viz ) / ( scatter | overlap | confusion) + plot_layout(heights = c(1, 1, 1, 1, 2, 2))
 ggsave('paper/paper_fig1_2025.png', width = 25, height = 32)
 ggsave('paper/paper_fig1_2025.pdf', width = 24, height = 32)
 
@@ -370,5 +384,9 @@ mitcn_meta %>% filter(group == 'Hyperdiploid') %>% distinct(case_id) %>% nrow()
 #the sus rescues 
 mitcn_meta %>% filter(id %in% rescues, !id %in% hyper_rescues) 
 
+#hypo rates in TCGA blood cancers
+tcga_classes %>% group_by(proj) %>% summarize(n_hypos = sum(group != 'Other'), hypo_rate = n_hypos/n()) %>% arrange(hypo_rate) %>% filter(proj %in% c('DLBC', 'LAML'))
 
-
+# clinical info about the viz ID patients
+mit_meta <- fread('mit_meta.tsv')
+mit_meta %>% filter(id %in% viz_ids)

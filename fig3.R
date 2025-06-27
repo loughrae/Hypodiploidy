@@ -265,6 +265,9 @@ forsurv <- tcga_classes %>%
 hypo_effect <- survfit(Surv(last, code) ~ Class, data = forsurv)
 surv_ploidy_classes <- ggsurvplot(hypo_effect, data = forsurv)
 
+wgd_effect_hypos <- survfit(Surv(last, code) ~ wgd, data = forsurv %>% filter(Class == 'Low-Hypodiploid'))
+surv_wgd_hypo <- ggsurvplot(wgd_effect_hypos, data = forsurv %>% filter(Class == 'Low-Hypodiploid'), pval = T)
+
 ## MH score sensitivity in TCGA
 
 # < 76 autosomes 
@@ -273,7 +276,8 @@ mh_tcga_76 <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>%
 mh_tcga_all <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>% filter(group != 'Other', wgd == 'WGD') %>% group_by(proj) %>% summarize(n_dh = n(), sens = mean(diff > 0)) %>% filter(n_dh >= 15) %>% ggplot(aes(x = reorder(proj, sens), y = sens)) + geom_col(fill = 'black', colour = 'black') + theme_large() + labs(x = '', y = 'MH score > 0', subtitle = 'All')  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) 
 
 surv_gg <- as.ggplot(surv_ploidy_classes$plot) + ggtitle('(h)')
-fig3_hypo_paper <- (((mit_wgd_rate | tcga_wgd_rate) | wgd_v_hypo) + plot_layout(widths = c(1,1,2))) / (segs_violins | hypo_segs_CI) / (cnh_violins | hypo_cnh_CI) / (stereotyped | surv_gg)
+surv_wgd_gg <- as.ggplot(surv_wgd_hypo$plot) + ggtitle('(i)')
+fig3_hypo_paper <- (((mit_wgd_rate | tcga_wgd_rate) | wgd_v_hypo) + plot_layout(widths = c(1,1,2))) / (segs_violins | hypo_segs_CI) / (cnh_violins | hypo_cnh_CI) / (stereotyped | surv_gg | surv_wgd_gg)
 
 ggsave(plot = fig3_hypo_paper, file = 'paper/fig3_hypo_paper.png', width = 25, height = 30)
 
