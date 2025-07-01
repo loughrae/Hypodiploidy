@@ -272,7 +272,7 @@ surv_wgd_hypo <- ggsurvplot(wgd_effect_hypos, data = forsurv %>% filter(Class ==
 
 # < 76 autosomes 
 mh_tcga_76 <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>% filter(group != 'Other', wgd == 'WGD', n_chr_nosex <= 76) %>% group_by(proj) %>% summarize(n_dh = n(), sens = mean(diff > 0)) %>% filter(n_dh >= 15) %>% ggplot(aes(x = reorder(proj, sens), y = sens)) + geom_col(fill = 'black', colour = 'black') + theme_large() + labs(x = '', y = 'MH score > 0', subtitle = 'Up to 76 autosomes') + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + ggtitle('(h)') 
-# all 
+# all -- it's more the specificity that changes in tetrasomy-dominant tetraploids, so not relevant to point
 mh_tcga_all <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>% filter(group != 'Other', wgd == 'WGD') %>% group_by(proj) %>% summarize(n_dh = n(), sens = mean(diff > 0)) %>% filter(n_dh >= 15) %>% ggplot(aes(x = reorder(proj, sens), y = sens)) + geom_col(fill = 'black', colour = 'black') + theme_large() + labs(x = '', y = 'MH score > 0', subtitle = 'All')  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) 
 
 surv_gg <- as.ggplot(surv_ploidy_classes$plot) + ggtitle('(h)')
@@ -281,7 +281,7 @@ fig3_hypo_paper <- (((mit_wgd_rate | tcga_wgd_rate) | wgd_v_hypo) + plot_layout(
 
 ggsave(plot = fig3_hypo_paper, file = 'paper/fig3_hypo_paper.png', width = 25, height = 30)
 
-supp_fig3 <- (mit_wgd_rate_hyper_rescues | maxprop_violins) / (segs_violins_nondoubledhypos | maxprop_violins_nodoubledhypos) / (chromothripsis | cnh_violins_nondoubledhypos) / (stereotyped_segs | (mh_tcga_76 | mh_tcga_all))
+supp_fig3 <- (mit_wgd_rate_hyper_rescues | maxprop_violins) / (segs_violins_nondoubledhypos | maxprop_violins_nodoubledhypos) / (chromothripsis | cnh_violins_nondoubledhypos) / (stereotyped_segs | (mh_tcga_76))
 ggsave(plot = supp_fig3, file = 'paper/supp_fig3.png', width = 25, height = 30)
 
 ### Stats in text ###
@@ -334,6 +334,18 @@ tcga_cnh %>% mutate(Class = factor(Class, levels = c('Aneuploid', 'Near-Haploid'
 # num segs v Class, controlling for tissue: first against dip, then against aneuploid
 segs_summary %>% mutate(Class = factor(Class, levels = c('Diploid', 'Near-Haploid', 'Low-Hypodiploid', 'Aneuploid', 'Polyploid'))) %>% do(tidy(glm(num_segments ~ Class + proj, data = .)))
 segs_summary %>% mutate(Class = factor(Class, levels = c('Aneuploid', 'Near-Haploid', 'Low-Hypodiploid', 'Diploid', 'Polyploid'))) %>% do(tidy(glm(num_segments ~ Class + proj, data = .)))
+
+#MH score stability measure in genome doubled tumours: stereotyped vs CIN (the >= 15 is important to make sure it's tumours that were determined to be CIN by chromosome loss patterns)
+tcga_scores %>%
+  left_join(tcga_classes, by = c("GDC_Aliquot")) %>%
+  filter(group != "Other", wgd == "WGD", n_chr_nosex <= 76) %>%
+  group_by(proj) %>%
+  mutate(n_dh = n()) %>%
+  filter(n_dh >= 15) %>%
+  ungroup() %>%
+  mutate(typ = ifelse(proj %in% c("ACC", "KICH"), proj, "Other")) %>%
+  group_by(typ) %>%
+  summarize(sens = mean(diff > 0))
 
 ## Survival Analysis ##
 # LH v Diploid - p = 5.32e-17
