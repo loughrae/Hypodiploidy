@@ -70,6 +70,28 @@ class_props <- tcga_classes %>%
   labs(x = "", y = "Proportion of Cases", subtitle = '(b)') +
   guides(fill = guide_legend(reverse = TRUE))
 
+class_props_facets <- tcga_classes %>%
+  group_by(proj) %>%
+  mutate(prop_hypo = mean(group != "Other")) %>%
+  mutate(set = ifelse(prop_hypo > 0.5, 'Hypodiploid', ifelse(prop_hypo > 0.05, '≥5% Hypodiploid', '<5% Hypodiploid'))) %>%
+  mutate(set = factor(set, levels = c('Hypodiploid', '≥5% Hypodiploid', '<5% Hypodiploid'))) %>%
+  mutate(Class = fct_rev(factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Diploid", "Aneuploid", "Polyploid")))) %>%
+  ggplot(aes(x = reorder(proj, -prop_hypo), fill = Class)) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = class_palette) +
+  theme_large_classic() +
+  theme(axis.text.y = element_text(size = 12)) +
+  theme(legend.position = "bottom") +
+  facet_wrap(~set, scales = 'free_x') +
+  labs(x = "", y = "Proportion of Cases", subtitle = '(b)') +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    strip.background = element_blank(),  
+    legend.position = "bottom"
+  )
+
 ##fig1c: masked hypodiploidy visualisation
 viz_ids <- mitcn_meta %>%
   filter(n_clones == 2) %>%
@@ -171,6 +193,9 @@ fig1a / (class_props | viz ) / ( scatter | overlap | confusion) + plot_layout(he
 ggsave('paper/paper_fig1_2025.png', width = 25, height = 32)
 ggsave('paper/paper_fig1_2025.pdf', width = 24, height = 32)
 
+fig1_new <- fig1a / class_props_facets + plot_layout(heights = c(1,1, 1,1,2))
+ggsave(plot = fig1_new, 'paper/paper_fig1_new.png', width = 25, height = 30) 
+ggsave(plot = fig1_new, 'paper/paper_fig1_new.pdf', width = 25, height = 30)
 
 ## Supplementary Figure 1
 
@@ -324,6 +349,7 @@ figs1 <- (rare_tetra | tcga_overlap) / (false_neg_viz | mh) / (fully_masked_plot
 ggsave(plot = figs1, file =  'paper/paper_suppfig1_2025.png', width = 25, height = 30)
 ggsave(plot = figs1, file = 'paper/paper_suppfig1_2025.pdf', width = 25, height = 30)
 
+
 ## Stats in text ##
 
 # number of ALL patients
@@ -336,6 +362,10 @@ mitcn_meta %>% filter(group %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% disti
 mitcn_meta %>% count(group) #163 NH, 142 LH --> 165 NH, 148 LH
 # proportion of hypodiploids between the two modes (Mit)
 mitcn_meta %>% filter(group %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% count(n_chr_nosex >= 28 & n_chr_nosex <= 31) %>% mutate(prop = n/sum(n)) #0.052 --> 0.0479
+#ALL peaks
+mitcn_meta %>% count(n_chr_nosex >= 23 & n_chr_nosex <= 27)
+mitcn_meta %>% count(n_chr_nosex >= 32 & n_chr_nosex <= 37)
+mitcn_meta %>% count(n_chr_nosex >= 28 & n_chr_nosex <= 31)
 # lowest chr count 
 mitcn_meta %>% summarize(min(n_chr_nosex))
 mitcn_chr_summary %>% filter(n_chr_nosex == 23) %>% filter(chr_somy != 1) %>% count(chr)
