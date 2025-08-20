@@ -84,16 +84,25 @@ wgd_v_hypo <- tcga_classes %>%
   geom_label_repel(aes(label = proj)) +
   theme_large(base_size = 18) +
   ggtitle('(b)') +
-  labs(x = "Low-Hypodiploidy Rate", y = "WGD Rate (excluding LH)") 
+  labs(x = "Low-Hypodiploidy Rate", y = "WGD Rate (non-hypodiploid)") 
 
 tcga_cnh <- tcga_classes %>%
   left_join(cnh, by = c("Patient")) %>%
   filter(!is.na(CNH)) 
 
 
+short_palette <- c(
+  "NH" = "#1b9e77", 
+  "LH"    = "#66c2a5", 
+  "Polyploid"       = "#3288bd", 
+  "Aneuploid"           = "#a6bddb" ,  
+  "Diploid" = 'lightblue'
+)
+
 ## fig3e: CNH by ploidy class (violins)
 cnh_violins <- tcga_cnh %>%
-  mutate(Class = factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Diploid", "Aneuploid", "Polyploid"))) %>%
+  mutate(Class = ifelse(Class == 'Low-Hypodiploid', 'LH', ifelse(Class == 'Near-Haploid', 'NH', Class))) %>%
+  mutate(Class = factor(Class, levels = c("NH", "LH", "Diploid", "Aneuploid", "Polyploid"))) %>%
   ggplot(aes(x = Class, y = CNH)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
@@ -102,7 +111,7 @@ cnh_violins <- tcga_cnh %>%
   theme(legend.position = "none") +
   ggtitle('(e)') +
   labs(x = "", y = "Copy Number Heterogeneity") +
-  scale_fill_manual(values = class_palette)
+  scale_fill_manual(values = short_palette)
 
 cnh_violins_nondoubledhypos <- tcga_cnh %>%
   filter(group == 'Other' | wgd == 'No WGD') %>%
@@ -141,7 +150,7 @@ stereotyped <- tcga_cnh %>%
   geom_violin() +
   geom_boxplot(alpha = 0.2) +
   geom_jitter(colour = "black", alpha = 0.2, height = 0) +
-  stat_compare_means() +
+  stat_compare_means(hjust = -1) +
   scale_fill_manual(values = c(`FALSE` = "#D9D9D9", `TRUE` = "#8DA0CB")) +
   theme_large() +
   theme(legend.position = "none") +
@@ -251,7 +260,8 @@ chromothripsis <- tcga_classes %>%
   labs(fill = "Chromothripsis", x = "", y = "Proportion of Cases") +
   theme_large_classic() +
   scale_fill_manual(values = c(`FALSE` = "black", `TRUE` = "lightsteelblue")) +
-  theme(legend.position = "bottom")
+  theme(legend.position = "bottom") +
+  ggtitle('(e)')
 
 ## Survival Analysis 
 forsurv <- tcga_classes %>%
@@ -262,11 +272,35 @@ forsurv <- tcga_classes %>%
   mutate(Class = factor(Class, levels = c('Diploid', 'Near-Haploid', 'Low-Hypodiploid', 'Aneuploid', 'Polyploid'))) 
 
 
-hypo_effect <- survfit(Surv(last, code) ~ Class, data = forsurv)
-surv_ploidy_classes <- ggsurvplot(hypo_effect, data = forsurv)
+hypo_effect <- survfit(Surv(last, code) ~ Class, data = forsurv %>% mutate(Class = as.character(Class)) %>% mutate(Class = ifelse(Class == 'Low-Hypodiploid', 'LH', ifelse(Class == 'Near-Haploid', 'NH', Class))) %>% mutate(Class = factor(Class, levels = c('Diploid', 'NH', 'LH', 'Aneuploid', 'Polyploid'))))
+labels_wrapped <- sub("Class=", "", names(hypo_effect$strata))
+surv_ploidy_classes <- ggsurvplot(hypo_effect, data = forsurv, ggtheme = theme_large() + theme(legend.text = element_text(size = 16)), legend.title = '', legend.labs = labels_wrapped)
 
 wgd_effect_hypos <- survfit(Surv(last, code) ~ wgd, data = forsurv %>% filter(Class == 'Low-Hypodiploid'))
-surv_wgd_hypo <- ggsurvplot(wgd_effect_hypos, data = forsurv %>% filter(Class == 'Low-Hypodiploid'), pval = T)
+surv_wgd_hypo <- ggsurvplot(wgd_effect_hypos, data = forsurv %>% filter(Class == 'Low-Hypodiploid'), ggtheme = theme_large() + theme(legend.text = element_text(size = 16)), pval = T, palette = c("#E41A1C", "#377EB8"), conf.int = TRUE, legend.title = '', legend.labs = c('No WGD', 'WGD'))
+
+# surv: stable vs CIN
+
+forsurv_filtered <- forsurv %>%
+  mutate(Class = as.character(Class)) %>%
+  filter(Class %in% c("Low-Hypodiploid"), proj %in% enough_lh) %>%
+  mutate(typ = ifelse(proj %in% c("KICH", "ACC"), "Stable", "CIN")) 
+
+km_fit <- survfit(Surv(last, code) ~ typ, data = forsurv_filtered)
+
+surv_stereotyped <- ggsurvplot(
+  km_fit,
+  data = forsurv_filtered,
+  risk.table = FALSE,         
+  pval = TRUE,               
+  conf.int = TRUE,           
+  legend.labs = c("CIN", "Stable"),  
+  legend.title = "",
+  xlab = "Time",
+  ylab = "Survival probability",
+  palette = c("#E41A1C", "#377EB8"),
+  ggtheme = theme_large() + theme(legend.text = element_text(size = 16))
+)
 
 ## MH score sensitivity in TCGA
 
@@ -275,14 +309,22 @@ mh_tcga_76 <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>%
 # all -- it's more the specificity that changes in tetrasomy-dominant tetraploids, so not relevant to point
 mh_tcga_all <- tcga_scores %>% left_join(tcga_classes, by = c('GDC_Aliquot')) %>% filter(group != 'Other', wgd == 'WGD') %>% group_by(proj) %>% summarize(n_dh = n(), sens = mean(diff > 0)) %>% filter(n_dh >= 15) %>% ggplot(aes(x = reorder(proj, sens), y = sens)) + geom_col(fill = 'black', colour = 'black') + theme_large() + labs(x = '', y = 'MH score > 0', subtitle = 'All')  + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) 
 
-surv_gg <- as.ggplot(surv_ploidy_classes$plot) + ggtitle('(h)')
-surv_wgd_gg <- as.ggplot(surv_wgd_hypo$plot) + ggtitle('(i)')
-fig3_hypo_paper <- (((mit_wgd_rate | tcga_wgd_rate) | wgd_v_hypo) + plot_layout(widths = c(1,1,2))) / (segs_violins | hypo_segs_CI) / (cnh_violins | hypo_cnh_CI) / (stereotyped | surv_gg | surv_wgd_gg)
+remove_axis <- theme(
+  axis.title = element_blank(),
+  axis.text = element_blank(),
+  axis.ticks = element_blank()
+)
 
-ggsave(plot = fig3_hypo_paper, file = 'paper/fig3_hypo_paper.png', width = 25, height = 30)
+surv_gg <- as.ggplot(surv_ploidy_classes$plot) + ggtitle('(h)') + theme_large() + xlab('') + theme(panel.border = element_blank()) + remove_axis + guides(color = guide_legend(nrow = 2))
+surv_wgd_gg <- as.ggplot(surv_wgd_hypo$plot) + ggtitle('(j)') + theme_large() + xlab('') + theme(panel.border = element_blank()) + remove_axis
+surv_stereotyped_gg <- as.ggplot(surv_stereotyped$plot) + ggtitle('(i)') + theme_large() + xlab('') + theme(panel.border = element_blank()) + remove_axis
+fig3_hypo_paper <- (((mit_wgd_rate | tcga_wgd_rate) | wgd_v_hypo) + plot_layout(widths = c(1,1,2))) / (segs_violins | hypo_segs_CI) / (cnh_violins | hypo_cnh_CI | stereotyped) / (surv_gg | surv_stereotyped_gg | surv_wgd_gg)
+ggsave(plot = fig3_hypo_paper, file = 'paper/fig4_hypo_paper.png', width = 25, height = 30)
+ggsave(plot = fig3_hypo_paper, file = 'paper/hypo_fig4.pdf', width = 25, height = 30)
 
 supp_fig3 <- (mit_wgd_rate_hyper_rescues | maxprop_violins) / (segs_violins_nondoubledhypos | maxprop_violins_nodoubledhypos) / (chromothripsis | cnh_violins_nondoubledhypos) / (stereotyped_segs | (mh_tcga_76))
-ggsave(plot = supp_fig3, file = 'paper/supp_fig3.png', width = 25, height = 30)
+ggsave(plot = supp_fig3, file = 'paper/supp_fig3_CIN.png', width = 25, height = 30)
+ggsave(plot = supp_fig3, file = 'paper/hypo_supp_fig3_CIN.pdf', width = 25, height = 30)
 
 ### Stats in text ###
 
@@ -360,8 +402,10 @@ coxph(Surv(last, code) ~ Class + age_at_index + gender + race, data = forsurv %>
 coxph(Surv(last, code) ~ Class + age_at_index + gender + race + proj, data = forsurv %>% mutate(Class = as.character(Class)) %>% filter(Class %in% c('Low-Hypodiploid', 'Aneuploid'))) %>% tidy()
 # n.s. with polyploid
 coxph(Surv(last, code) ~ Class + age_at_index + gender + race, data = forsurv %>% mutate(Class = as.character(Class)) %>% filter(Class %in% c('Low-Hypodiploid', 'Polyploid'))) %>% tidy()
-# doubled v non-doubled LH - n.s.
+# doubled v non-doubled LH - n.s. (0.192)
 coxph(Surv(last, code) ~ wgd + age_at_index + gender + race, data = forsurv %>% mutate(Class = as.character(Class)) %>% filter(Class == 'Low-Hypodiploid')) %>% tidy()
-# doubled v non-doubled LH by proj - n.s.
+# doubled v non-doubled LH by proj - n.s. (0.588)
 coxph(Surv(last, code) ~ wgd + age_at_index + gender + race + proj, data = forsurv %>% mutate(Class = as.character(Class)) %>% filter(Class == 'Low-Hypodiploid')) %>% tidy()
+# stable v CIN hypodiploids
+coxph(Surv(last, code) ~ typ + age_at_index + gender + race, data = forsurv_filtered) %>% tidy()
 

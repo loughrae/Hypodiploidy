@@ -16,6 +16,7 @@ viz_ids <- mitcn_meta %>%
 
 viz <- mitcn_chr_summary %>%
   filter(id %in% viz_ids) %>%
+  mutate(group = ifelse(group == 'Low-Hypodiploid', 'LH', ifelse(group == 'Near-Haploid', 'NH', ifelse(group == 'Hyperdiploid', 'HeH', 'what')))) %>%
   ggplot(aes(x = factor(sub("chr", "", chr), levels = 1:22), y = group, fill = as.factor(chr_somy))) +
   geom_tile() +
   facet_wrap(~case_id, nrow = 4, scales = "free_y") +
@@ -211,7 +212,7 @@ fully_masked_plot <- scores_mit %>%
   xlab("Autosomes") +
   ylab("Inferred Fully-Masked Cases") +
   labs(subtitle = "Inferred Fully-Masked Cases") +
-  ggtitle('(e)')
+  ggtitle('(d)')
 
 target_classes <- target %>%
   mutate(len = (End - Start) + 1) %>%
@@ -249,8 +250,49 @@ target_spec <- target_classes %>%
 
 fig2 <- (viz) / (scatter | overlap | confusion) / (mh | (heh_spec / target_spec))
 ggsave(plot = fig2, file =  'paper/MH_Score_fig.png', width = 28, height = 30)
-ggsave(plot = fig2, file = 'paper/MH_Score_fig_2025.pdf', width = 28, height = 30)
+ggsave(plot = fig2, file = 'paper/hypo_fig2_MH_Score.pdf', width = 28, height = 30)
 
 figsMH <- (rare_tetra | tcga_overlap) / (false_neg_viz | fully_masked_plot) 
 ggsave(plot = figsMH, file =  'paper/Supp_MH_score.png', width = 25, height = 20)
-ggsave(plot = figsMH, file = 'paper/Supp_MH_score.pdf', width = 25, height = 20)
+ggsave(plot = figsMH, file = 'paper/hypo_supp_fig1_MH_score.pdf', width = 25, height = 20)
+
+# number of cases analysed by MEDICC
+nrow(med) #148 --> 150
+nrow(true_pos) #125 --> 126
+nrow(heh) #577
+true_pos %>% summarise(median(n_trisomic)) #0
+heh %>% summarize(median(n_3)) #6
+
+#false-negs
+mh_ids <- true_pos %>% pull(case_id) %>% unique()
+mitcn_meta %>% filter(case_id %in% mh_ids) %>% count(group) #LHs make up 36% of hypos in the test set
+mitcn_meta %>% filter(case_id %in% false_neg_ids) %>% count(group) #but 66% of false negs
+true_pos %>% filter(diff <= 0) %>% summarize(median(diff))
+true_pos %>% filter(diff <= 0) %>% summarize(median(n_trisomic))
+#sensitivity in the hyperdiploid range
+true_pos %>% filter(group == 'Hyperdiploid') %>% count(diff > 0)
+#rescues
+NROW(rescues)
+NROW(hyper_rescues)
+mitcn_meta %>% filter(id %in% hyper_rescues) %>% filter(n_clones > 1) #one subclonal
+coexisting <- mitcn_meta %>% distinct(case_id, .keep_all = T) %>% filter(any_lows > 0, n_clones > any_lows) %>% mutate(doubled = case_id %in% wgd_cases) # coexisting: 141 --> 142
+exclusive_hypo <- mitcn_meta %>% distinct(case_id, .keep_all = T) %>% filter(any_lows == n_clones)  #153 --> 159
+mitcn_meta %>% filter(id %in% rescues) %>% distinct(case_id) #17
+#total hypodiploids: 
+nrow(exclusive_hypo) + nrow(coexisting) + NROW(rescues)
+
+
+#number of hyperdiploids with a subclonal hypo
+mitcn_meta %>% filter(group == 'Hyperdiploid', any_lows > 0) %>% distinct(case_id) %>% nrow() #69
+#total cases with a hyperdiploid clone --> 989
+mitcn_meta %>% filter(group == 'Hyperdiploid') %>% distinct(case_id) %>% nrow()
+
+
+
+#the sus rescues 
+mitcn_meta %>% filter(id %in% rescues, !id %in% hyper_rescues) 
+target_classes %>% filter(n_chr_nosex == 46) %>% count(n_tetrasomic <= n_trisomic)
+
+# clinical info about the viz ID patients
+mit_meta <- fread('mit_meta.tsv')
+mit_meta %>% filter(id %in% viz_ids)

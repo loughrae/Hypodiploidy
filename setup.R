@@ -54,18 +54,41 @@ ascat_medicc <- fread('ASCAT_MEDICC_calls.tsv', header = T)
 clin <- read.table("~/Downloads/clin_query.txt", sep = "\t", header = T) %>% 
   select(submitter_id, age_at_index, gender, race, disease, vital_status, days_to_death, days_to_last_follow_up)
 
-## themes 
-theme_large_base <- function(base_theme, base_size = 18, base_family = "") {
-  base_theme(base_size = base_size, base_family = base_family) %+replace%
-    theme(
-      text = element_text(size = base_size),
-      axis.title = element_text(size = base_size),
-      axis.text = element_text(size = base_size),
-      legend.title = element_text(size = base_size),
-      legend.text = element_text(size = base_size),
-      strip.text = element_text(size = base_size)
-    )
+# theme
+theme_large_base <- function(base_theme, base_size = 20, base_family = "") {
+  base <- base_theme(base_size = base_size, base_family = base_family)
+  
+  # Get default theme values
+  default_title <- theme_get()$plot.title %||% element_text()
+  default_subtitle <- theme_get()$plot.subtitle %||% element_text()
+  
+  base %+replace% theme(
+    text = element_text(size = base_size),
+    axis.title = element_text(size = base_size),
+    axis.text = element_text(size = base_size),
+    legend.title = element_text(size = base_size, face = "bold"),
+    legend.text = element_text(size = base_size),
+    strip.text = element_text(size = base_size),
+    plot.title = modifyList(default_title, list(face = "bold")),
+    plot.subtitle = modifyList(default_subtitle, list(face = "bold"))
+  )
 }
+
+
+## themes 
+# theme_large_base <- function(base_theme, base_size = 20, base_family = "") {
+#   base_theme(base_size = base_size, base_family = base_family) %+replace%
+#     theme(
+#       text = element_text(size = base_size),
+#       axis.title = element_text(size = base_size),
+#       axis.text = element_text(size = base_size),
+#       legend.title = element_text(size = base_size),
+#       plot.title = element_text(size = base_size, face = 'bold', inherit.blank = T),
+#       plot.subtitle = element_text(size = base_size, face = 'bold', inherit.blank = T),
+#       legend.text = element_text(size = base_size),
+#       strip.text = element_text(size = base_size)
+#     )
+# }
 
 theme_large <- function(base_size = 18, base_family = "") {
   theme_large_base(theme_bw, base_size, base_family)

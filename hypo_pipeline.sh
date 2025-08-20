@@ -26,11 +26,12 @@ Rscript filter_TCGA_ASCAT.R
 Rscript MH_score_heuristic.R
 
 ## do analyses and make figures
-Rscript fig1.R 
+Rscript prevalence_fig.R 
+Rscript MH_score_fig.R
 
 bedtools intersect -a filtered_ascat.bed -b hg38_arms.bed  -wb > fasc_arms.bed  
 bedtools intersect -a mitcn_all_for_arms.bed -b hg38_arms.bed  -wb > mitcn_arms.bed
-Rscript fig2.R
+Rscript patterns_fig.R
 
-Rscript fig3.R
-Rscript fig4.R
+Rscript CIN_fig.R
+Rscript origins_fig.R

@@ -102,15 +102,19 @@ hypo_arm_loss_rates_tissue <- joint_arm_losses %>%
 
 hypo_chr_loss_rates <- joint_chr_loss_rates %>% filter(Class == 'Low-Hypodiploid')
 
+hypo_props <- tcga_classes %>% group_by(proj) %>% summarize(perc_hypo = mean(group != 'Other'))
+
 #Loss Rates graph
 joint_loss_rates_inequality <- hypo_arm_loss_rates_tissue %>%
   filter(proj %in% c(enough_lh, 'ALL')) %>%
   filter(!chr_arm %in% acrocentric_arms) %>%
   group_by(proj) %>% 
-  mutate(sha = Entropy(loss_rate), gi = Gini(loss_rate)) 
+  mutate(sha = Entropy(loss_rate), gi = Gini(loss_rate)) %>%
+  left_join(hypo_props, by = c('proj'))
+
 
 joint_loss_rates_graph <- joint_loss_rates_inequality %>%
-  ggplot(aes(x = reorder(proj, gi), y = factor(chr_arm, levels = chr_levels), fill = loss_rate)) + 
+  ggplot(aes(x = reorder(proj, perc_hypo), y = factor(chr_arm, levels = chr_levels), fill = loss_rate)) + #note ALL is NA
   geom_tile() + scale_fill_viridis_c() + 
   xlab('') + ylab('') + theme_large(base_size = 14) + theme(legend.position = 'right') + labs(fill = 'Lost') + ggtitle('(a)') + coord_flip() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
@@ -143,7 +147,7 @@ toheat <- lossprofiles %>%
   proxy::dist(by_rows = T, method = "Jaccard") %>%
   as.matrix()
 
-htmap <- ComplexHeatmap::pheatmap(toheat, col = rev(viridis::viridis(15, option = "D")), show_rownames = F, show_colnames = F, annotation_row = idg2 %>% select(group), annotation_names_row = F, heatmap_legend_param = list(title = "Distance"), annotation_colors = list(group = deframe(distinct(idg2)))) %>% as.ggplot() + ggtitle('(b)')
+htmap <- ComplexHeatmap::pheatmap(toheat, col = rev(viridis::viridis(15, option = "D")), show_rownames = F, show_colnames = F, annotation_row = idg2 %>% select(group), annotation_names_row = F, heatmap_legend_param = list(title = "Distance"), annotation_colors = list(group = deframe(distinct(idg2)))) %>% as.ggplot() + ggtitle("(b)") + theme(plot.title = element_text(size = 18, face = "bold"))
 
 ## jaccard tiles
 jacc_tile <- toheat %>%
@@ -184,7 +188,7 @@ nuclear_location <- hypo_chr_loss_rates %>%
   geom_text_repel(aes(label = chr)) +
   theme_large() +
   theme(legend.position = "none") +
-  stat_compare_means(hjust = -0.7, size = 4) +
+  stat_compare_means(hjust = -0.7, size = 8) +
   xlab('Nuclear Location') + 
   ylab('Chromosome Loss Rate') +
   ggtitle('(e)')
@@ -195,7 +199,7 @@ length_cor <- hypo_chr_loss_rates %>%
   ggplot(aes(x = round(length, 2), y = loss_rate)) +
   geom_point(size = 5, colour = "darkblue") +
   geom_smooth(method = "lm", fill = "lightsteelblue", colour = "black") +
-  stat_cor(vjust = 1.5, size = 8) +
+  stat_cor(vjust = 1.5, hjust = -2, size = 8) +
   geom_text_repel(size = 6, aes(label = sub("chr", "", chr))) +
   theme_large() +
   xlab("Chromosome Length (Mb)") +
@@ -233,6 +237,8 @@ fig2 <- (joint_loss_rates_graph | htmap) / (length_cor | ds_sum_p_haplo ) / ( nu
 #(joint_loss_rates_graph | htmap) /  / ( tuson_loss | nuclear_location)
 
 ggsave(plot = fig2, file = 'paper/fig2_paper.png', width = 25, height = 30)
+ggsave(plot = fig2, file = 'paper/hypo_fig3_patterns.pdf', width = 25, height = 30)
+
 
 ## Supp Fig 2 ##
 
@@ -273,6 +279,14 @@ ds_loss_mean <- hypo_chr_loss_rates %>%
   geom_text_repel(size = 6, aes(label = sub('chr', '', chr))) 
 
 lr_overall <- hypo_chr_loss_rates %>%
+  do(tidy(glm(loss_rate ~ sum_p_haplo + location + chrom_tsg_og_score + length, data = .)))
+
+#without ALL
+joint_chr_losses %>%
+  group_by(Class, chr, length, location, chrom_tsg_og_score, sum_p_haplo, mean_p_haplo) %>%
+  filter(proj != 'ALL', Class == 'Low-Hypodiploid') %>%
+  summarize(loss_rate = mean(loss == 'Lost')) %>%
+  ungroup() %>% 
   do(tidy(glm(loss_rate ~ sum_p_haplo + location + chrom_tsg_og_score + length, data = .)))
 
 lr_overall_meands <- hypo_chr_loss_rates %>%
@@ -360,20 +374,45 @@ aneuploid_v_hypo <- joint_arm_losses %>%
   geom_smooth(method = "lm") +
   stat_cor(size = 8)
 
+tuson_loss_noALL <- joint_chr_losses %>%
+  group_by(Class, chr, length, location, chrom_tsg_og_score, sum_p_haplo, mean_p_haplo) %>%
+  filter(proj != 'ALL') %>%
+  summarize(loss_rate = mean(loss == 'Lost')) %>% filter(Class == 'Low-Hypodiploid') %>%
+  ggplot(aes(x = chrom_tsg_og_score, y = loss_rate)) +
+  geom_point(size = 5, colour = 'darkblue') +
+  geom_smooth(method = 'lm', fill = 'lightsteelblue', colour = 'black') +
+  stat_cor(size = 8) +
+  theme_large() +
+  xlab("CHROM score (TSG - OG)") +
+  ylab("Chromosome Loss Rate") +
+  geom_text_repel(size = 6, aes(label = sub('chr', '', chr))) +
+  ggtitle('(g)')
+
 suppfig2 <- ( nh_all | arm_cors) / (jacc_tile) / (location_no17 | lr_tissues_figure | loss_group_figure)
-ggsave(plot = suppfig2, file = 'paper/supp_fig2.png', width = 27, height = 30)
+ggsave(plot = suppfig2, file = 'paper/supp_fig2_patterns.png', width = 27, height = 30)
+ggsave(plot = suppfig2, file = 'paper/hypo_supp_fig2_patterns.pdf', width = 27, height = 30)
 
 
 ## Stats in text ##
 
 # non-uniformity
 joint_arm_losses %>%
-  filter(Class == "Low-Hypodiploid", proj %in% enough_lh) %>%
+  filter(Class == "Low-Hypodiploid", proj %in% c(enough_lh, 'ALL')) %>%
   group_by(proj, chr_arm) %>%
   summarize(n_losses = sum(loss == "Lost"), prop_lost = n_losses / n()) %>%
   group_by(proj) %>%
   summarize(tidy(chisq.test(n_losses))) %>%
   arrange(desc(p.value)) # all p < 1e-6
+
+#strongest deviations
+joint_arm_losses %>%
+  filter(Class == "Low-Hypodiploid", proj %in% c(enough_lh, 'ALL')) %>%
+  group_by(proj, chr_arm) %>%
+  summarize(n_losses = sum(loss == "Lost"), prop_lost = n_losses / n()) %>%
+  group_by(proj) %>%
+  summarize(tidy(chisq.test(n_losses))) %>%
+  arrange(desc(statistic)) # all p < 1e-6
+
 
 #non uniformity for whole chromosomes
 joint_chr_losses %>%
@@ -412,6 +451,10 @@ joint_chr_losses %>%
   ungroup() %>%
   count(loss_rate < 0.1)
 
+#arm diffs - 5q
+joint_arm_losses %>% filter(Class %in% c('Near-Haploid', 'Low-Hypodiploid'), proj != 'ALL') %>% group_by(chr_arm, chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr5')
+joint_arm_losses %>% filter(Class %in% c('Near-Haploid', 'Low-Hypodiploid'), proj != 'ALL') %>% group_by(chr_arm, chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr3')
+
 # most retained chromosomes overall -- note no cancer type filtering
 joint_chr_losses %>%
   group_by(Class, chr) %>%
@@ -419,6 +462,12 @@ joint_chr_losses %>%
   filter(Class == "Low-Hypodiploid") %>%
   ungroup() %>%
   arrange(loss_rate)
+
+# retention v loss re: cancer type
+joint_chr_losses %>%
+  filter(proj %in% c(enough_lh)) %>%
+  group_by(Class, proj, chr) %>%
+  summarize(loss_rate = mean(loss == "Lost")) %>% filter(Class == 'Low-Hypodiploid') %>% ggplot(aes(x = reorder(chr, loss_rate, FUN = median), y = loss_rate)) + geom_boxplot() 
 
 ## univariate LR: length alone
 degree_aneu %>%
@@ -444,6 +493,6 @@ degree_aneu %>%
 #chr7
 joint_chr_losses %>% filter(Class == 'Low-Hypodiploid', proj %in% c(enough_lh, 'ALL')) %>% group_by(chr, proj) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr7')
 joint_chr_losses %>% filter(Class %in% c('Low-Hypodiploid', 'Near-Haploid'), proj != 'ALL') %>% group_by(chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% arrange(loss_rate)
-
+joint_chr_losses %>% filter(Class %in% c('Low-Hypodiploid', 'Near-Haploid')) %>% filter(proj != 'ALL') %>% group_by(chr) %>% summarize(loss_rate = mean(loss == 'Lost')) %>% filter(chr == 'chr7')
 #median loss rates by location 
 hypo_chr_loss_rates %>% group_by(location) %>% summarize(median(loss_rate))

@@ -123,7 +123,7 @@ mu_lh_v_aneuploid <- status %>%
   do(tidy(glm(mutated ~ Class + total_non_syn_mu + proj, family = 'binomial', data = .))) %>% 
   ungroup()
 
-mu_lh_v_aneuploid %>% filter(term == 'ClassLow-Hypodiploid') %>% mutate(bh = p.adjust(p.value, method = 'BH')) %>% filter(bh < 0.05) 
+mu_lh_v_aneuploid %>% filter(term == 'ClassLow-Hypodiploid') %>% mutate(bh = p.adjust(p.value, method = 'BH')) %>% filter(bh < 0.05) #ARID1A, CTCF and RPL22 are nominally diff though (depleted in LH)
 
 
 ## fig4a: volcano plot of mutations in LH
@@ -173,14 +173,16 @@ p53_barchart <- mafs %>%
   mutate(perc_p53 = sum(p53 > 0) / n()) %>%
   mutate(Class = ifelse(Class == "Low-Hypodiploid", "LH", ifelse(Class == "Near-Haploid", "NH", Class))) %>%
   mutate(Class = factor(Class, levels = c("NH", "LH", "Diploid", "Aneuploid", "Polyploid"))) %>%
-  ggplot(aes(x = Class, fill = p53 > 0)) +
+  mutate(TP53 = ifelse(p53 > 0, 'Mut', 'WT')) %>%
+  mutate(TP53 = factor(TP53, levels = c('WT', 'Mut'))) %>%
+  ggplot(aes(x = Class, fill = TP53)) +
   geom_bar(position = "fill") +
   xlab("") +
-  labs(fill = "Mutated TP53", subtitle = '(b)') +
+  labs(subtitle = '(b)') +
   ylab("Proportion of Cases") +
   theme_large_classic() +
   theme(legend.position = "bottom") +
-  scale_fill_manual(values = c(`FALSE` = "black", `TRUE` = "lightsteelblue"))
+  scale_fill_manual(values = c(`WT` = "black", `Mut` = "lightsteelblue"))
 
 ## fig4d: Microsatellite instability
 msi <- fread('~/Downloads/mantis_msi.csv') %>% clean_names()
@@ -282,7 +284,7 @@ hypo_v_ragnum <- rag_scores %>%
   xlab("Median hypoxia score among non-LH tumours") +
   ylab("Hypodiploidy Rate") +
   labs(subtitle = '(g)') +
-  theme_bw() +
+  theme_large() +
   geom_label_repel(aes(label = proj))
 
 bts <- 12
@@ -300,7 +302,7 @@ hyp_violins <- rag_scores %>%
   ggplot(aes(x = Class, y = ragnum_score_pan)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
-  theme_bw() +
+  theme_large() +
   xlab("") +
   ylab("Ragnum Hypoxia Score") +
   theme(legend.position = "none", axis.text.x = element_text(size = bts), axis.title.y = element_text(size = bts + 2)) +
@@ -312,7 +314,7 @@ hyp_violins <- rag_scores %>%
 hyp_ploidy <- rag_scores %>% ggplot(aes(x = ploidy, y = ragnum_score_pan)) +
   geom_point(alpha = 0.2) +
   geom_smooth(colour = 'black', fill = 'lightsteelblue') +
-  theme_minimal() +
+  theme_large() +
   ylab("Ragnum Hypoxia Score") +
   xlab("Tumour Ploidy") +
   theme(axis.text.x = element_text(size = bts), axis.title.y = element_text(size = bts + 2), axis.title.x = element_text(size = bts + 2)) +
@@ -340,14 +342,16 @@ stable_p53 <- mafs %>%
   filter(Class == 'Low-Hypodiploid') %>%
   mutate(proj2 = ifelse(proj %in% c('ACC', 'KICH'), 'Stereotyped', 'CIN')) %>%
   mutate(proj2 = factor(proj2, levels = c('Stereotyped', 'CIN'))) %>%
-  ggplot(aes(x = proj2, fill = p53 > 0)) +
+  mutate(TP53 = ifelse(p53 > 0, 'Mut', 'WT')) %>%
+  mutate(TP53 = factor(TP53, levels = c('WT', 'Mut'))) %>%
+  ggplot(aes(x = proj2, fill = TP53)) +
   geom_bar(position = "fill") +
   xlab("") +
-  labs(fill = "Mutated TP53", subtitle = '(i)') +
+  labs(subtitle = '(i)') +
   ylab("Proportion of Cases") +
   theme_large_classic() +
   theme(legend.position = "bottom") +
-  scale_fill_manual(values = c(`FALSE` = "black", `TRUE` = "lightsteelblue"))
+  scale_fill_manual(values = c(`WT` = "black", `Mut` = "lightsteelblue"))
 
 a1 <- hyp %>%
   group_by(proj) %>%
@@ -378,7 +382,7 @@ diffs <- a1 %>%
   ggplot(aes(x = co, y = reorder(sub("(_).*", "", Score), co, FUN = median), colour = condition_pretty)) +
   geom_point(size = 5, aes(shape = p.val < 0.05)) +
   facet_wrap(~ploidy_rate, scales = "free") +
-  theme_bw() +
+  theme_large() +
   theme(legend.position = "bottom") +
   xlab("Correlation between Hypoxia and Extreme Ploidy") +
   ylab("Hypoxia Score") +
@@ -414,7 +418,8 @@ sig_hypo_pan <- vities %>%
 #fig4 <- (lh_volcano | p53_barchart) / (lh_v_poly_mus | msi_violin) / (hyp_violins | hyp_ploidy) / (hypo_v_ragnum | diffs)
 fig4 <- (lh_volcano | p53_barchart) / (lh_v_poly_mus | msi_violin) / (hyp_violins | hyp_ploidy | hypo_v_ragnum) / (stable_hyp | stable_p53)
 
-ggsave(plot = fig4, file = 'paper/fig4_test.png', width = 25, height = 30)
+ggsave(plot = fig4, file = 'paper/hypo_fig5_origins.png', width = 25, height = 30)
+ggsave(plot = fig4, file = 'paper/hypo_fig5_origins.pdf', width = 25, height = 30)
 
 hypo_v_ragnum_incloutliers <- rag_scores %>% group_by(proj) %>% 
   summarize(wgd_rate = sum(wgd == 'WGD')/n(), hypo_rate = mean(group == 'Low-Hypodiploid'), avg_hyp_nohypos = median(ragnum_score_pan[group != 'Low-Hypodiploid']), avg_hyp_nowgd = median(ragnum_score_pan[wgd == 'No WGD'])) %>%
@@ -432,7 +437,7 @@ hyp_violins_nondoubledhypos <- rag_scores %>%
   ggplot(aes(x = Class, y = ragnum_score_pan)) +
   geom_violin(aes(fill = Class)) +
   geom_boxplot(alpha = 0.2) +
-  theme_bw() +
+  theme_large() +
   xlab("") +
   ylab("Ragnum Hypoxia Score") +
   theme(legend.position = "none", axis.text.x = element_text(size = bts), axis.title.y = element_text(size = bts + 2)) +
@@ -488,11 +493,11 @@ hypodiploidy_v_PI <- rna_ids %>%
 
 #regression against diploid
 rag_scores %>% left_join(rna_ids, by = c('submitter_id')) %>% left_join(pis_cpm, by = c('file_id' = 'V3')) %>% filter(Class %in% c('Low-Hypodiploid', 'Diploid')) %>% do(tidy(glm(ragnum_score_pan ~ Class + PI_cpm, data = .))) 
-#regression against aneuploid
-rag_scores %>% left_join(rna_ids, by = c('submitter_id')) %>% left_join(pis_cpm, by = c('file_id' = 'V3')) %>% do(tidy(glm(ragnum_score_pan ~ Class + PI_cpm, data = .)))
-
+#regression against aneuploid, p = 0.0127
+rag_scores %>% left_join(rna_ids, by = c('submitter_id')) %>% left_join(pis_cpm, by = c('file_id' = 'V3')) %>% filter(Class %in% c('Aneuploid', 'Low-Hypodiploid')) %>% do(tidy(glm(ragnum_score_pan ~ Class + PI_cpm, data = .)))
 figS4 <- (total_mus_by_class | mu_per_ploidy_by_class) / (msi_bar | msi_violin_nondoubledhypos) / (tissue_hypoxia) / (hyp_violins_nondoubledhypos | diffs | hypodiploidy_v_PI)
-ggsave(plot = figS4, file = 'paper/supp_fig4.png', width = 25, height = 30)
+ggsave(plot = figS4, file = 'paper/hypo_supp_fig4_origins.png', width = 25, height = 30)
+ggsave(plot = figS4, file = 'paper/hypo_supp_fig4_origins.png', width = 25, height = 30)
 
 ## In text ##
 #hypoxia scores by class
@@ -508,7 +513,7 @@ mafs %>%
   group_by(Class) %>%
   mutate(perc_p53 = sum(p53 > 0) / n()) %>% distinct(Class, .keep_all = T)
 
-#p53 mutation rates in LHs by group
+#p53 mutation rates in LHs by stereotyped vs CIN
 mafs %>%
   filter(proj %in% enough_lh) %>%
   group_by(wgd, Class, group, Patient, Sample, proj) %>%
