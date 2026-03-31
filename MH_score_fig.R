@@ -1,6 +1,8 @@
 source('setup.R')
 source('MH_score_heuristic.R')
 
+library(figpatch)
+
 tcga_classes <- fread('TCGA_ploidy_classes.tsv')
 mitcn_meta <- fread('mitcn_meta.tsv')
 mitcn_chr_summary <- fread('mitcn_chr_summary.tsv')
@@ -16,15 +18,17 @@ viz_ids <- mitcn_meta %>%
 
 viz <- mitcn_chr_summary %>%
   filter(id %in% viz_ids) %>%
-  mutate(group = ifelse(group == 'Low-Hypodiploid', 'LH', ifelse(group == 'Near-Haploid', 'NH', ifelse(group == 'Hyperdiploid', 'HeH', 'what')))) %>%
-  ggplot(aes(x = factor(sub("chr", "", chr), levels = 1:22), y = group, fill = as.factor(chr_somy))) +
+  mutate(group = ifelse(group == 'Low-Hypodiploid', 'LH', ifelse(group == 'Near-Haploid', 'NH', ifelse(group == 'Hyperdiploid', 'Masked', 'what')))) %>%
+  mutate(group = factor(group, levels = c('Masked', 'NH', 'LH'))) %>%
+  mutate(chr_somy = factor(chr_somy, levels = c(1, 2, 3, 4))) %>%
+  ggplot(aes(x = factor(sub("chr", "", chr), levels = 1:22), y = group, fill = chr_somy)) +
   geom_tile() +
   facet_wrap(~case_id, nrow = 4, scales = "free_y") +
   labs(fill = "Somy", x = "Chromosome", y = "") +
-  scale_fill_viridis_d(option = "mako") +
-  theme_large() +
-  theme(legend.position = "right", strip.background = element_blank(), strip.text = element_blank()) +
-  labs(subtitle = "(a)")
+  scale_fill_manual(values = c(`1` = 'deepskyblue3', `2` = 'darkblue', `3` = 'red', `4` = 'darkgoldenrod3'), drop = F) +
+  theme_large(base_size = 25) +
+  theme(legend.position = "right", strip.background = element_blank()) +
+  labs(subtitle = "(b)") 
 
 ##fig1d: trisomies with autosome count
 heh <- read.xlsx('Supplementary_data_1_Woodward et al.xlsx', startRow = 2) %>%
@@ -56,18 +60,20 @@ heh_aut <- read.xlsx("Supplementary_data_1_Woodward et al.xlsx", startRow = 2) %
   select(label, n_3, n_4, diff, n_autosome) %>%
   rename(chrs = n_autosome)
 
+options(scipen = 5)
 scatter <- true_pos %>%
   rename(n_3 = n_trisomic, n_4 = n_tetrasomic) %>%
   select(label, n_3, n_4, diff, chrs) %>%
   rbind(heh_aut) %>%
   mutate(label = ifelse(label == "True-Pos", "Masked Hypodiploid", ifelse(label == "True-Neg", "Hyperdiploid", "What"))) %>%
   ggplot(aes(x = chrs, y = n_3, colour = label, group = label)) +
-  geom_jitter() +
-  stat_cor() +
+  geom_jitter(size = 2) +
+  stat_cor(size = 8, p.accuracy = 1e-100) +
+  geom_smooth(method = 'lm') +
   ylab("Trisomies") +
   xlab("Autosome Count") +
-  labs(subtitle = '(b)', x = 'Autosome Count', y = 'Trisomies') +
-  theme_large() +
+  labs(subtitle = '(c)', x = 'Autosome Count', y = 'Trisomies') +
+  theme_large(base_size = 25) +
   theme(legend.position = "bottom") +
   scale_colour_manual(values = c("darkgreen", "darkblue"))
 
@@ -80,10 +86,10 @@ true_pos_reformat <- true_pos %>%
 overlap <- true_pos_reformat %>%
   ggplot(aes(x = diff, fill = label)) +
   geom_bar(position = "stack") +
-  theme_large() +
+  theme_large(base_size = 25) +
   theme(legend.position = "bottom") +
   scale_fill_manual(values = c("darkgreen", "darkblue")) + 
-  labs(subtitle = "(c)", fill = "", x = "Tetrasomies - Trisomies", y = "Number of Cases")
+  labs(subtitle = "(d)", fill = "", x = "Tetrasomies - Trisomies", y = "Number of Cases")
 
 ## fig1f: MH score confusion matrix
 confusion <- true_pos_reformat %>% 
@@ -96,12 +102,13 @@ confusion <- true_pos_reformat %>%
   geom_label(size = 7, aes(x = label, y = score, colour = perc > 0.5, label = paste0(round(perc * 100, 2), "%\n", n))) +
   xlab("Label") +
   ylab("Tetrasomies > Trisomies") +
-  theme_large_classic() +
-  labs(subtitle = "(d)") +
+  theme_large_classic(base_size = 25) +
+  labs(subtitle = "(e)") +
   labs(fill = "") +
-  theme(legend.position = "none") +
-  xlab("") +
-  scale_color_manual(values = c("FALSE" = "white", "TRUE" = "black"), guide = "none")
+  xlab("") + 
+  labs(fill = 'Proportion') +
+  scale_color_manual(values = c("TRUE" = "white", "FALSE" = "black"), guide = "none") +
+  scale_fill_gradient(low = "white", high = "steelblue", limits = c(0, 1))
 
 
 target_query <- GDCquery(project = 'TARGET-ALL-P2', data.category = 'Copy Number Variation', access = 'open', workflow.type = 'ASCAT2', data.type = 'Allele-specific Copy Number Segment')
@@ -123,7 +130,7 @@ rare_tetra <- target %>%
   group_by(GDC_Aliquot) %>%
   summarize(loh = sum(loh_ind*len)/sum(len), ploidy = sum(prod)/sum(len)) %>%
   ggplot(aes(x = ploidy, y = loh)) + geom_point() + stat_cor() +
-  theme_large() + labs(x = 'Ploidy', y = 'Loss of heterozygosity') + ggtitle('(a)')
+  theme_large(base_size = 25) + labs(x = 'Ploidy', y = 'Loss of heterozygosity') + ggtitle('(a)')
 
 
 tcga_heuristic <- tcga_scores %>%
@@ -136,12 +143,25 @@ tcga_overlap <- tcga_heuristic %>%
   mutate(diff = n_4 - n_3) %>%
   ggplot(aes(x = diff, fill = interest)) +
   geom_bar(position = "dodge") +
-  theme_large() +
+  theme_large(base_size = 25) +
   theme(legend.position = "bottom") +
   scale_fill_manual(values = c("darkgreen", "darkblue")) +
   xlab("Tetrasomies - Trisomies") +
   labs(fill = "") +
   ylab("Number of cases") + ggtitle('(b)')
+
+tcga_heuristic_cancer_types <- tcga_heuristic %>%
+  count(proj) %>%
+  ggplot(aes(x = reorder(proj, n), y = n)) +
+  geom_col() +
+  theme_minimal(base_size = 12) + ylab('Number of cases') + xlab('Cancer Type') +
+  scale_y_continuous(breaks = c(0, 50, 100, 150)) +
+  coord_cartesian(ylim = c(0, 150)) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5),
+    panel.grid = element_blank()
+  ) + ggtitle('(e)') + theme_large(base_size = 25) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
 
 enough_masked_hypo <- tcga_classes %>% filter(group != 'Other', wgd == 'WGD') %>% count(proj) %>% filter(n >= 15) %>% pull(proj) 
 
@@ -153,7 +173,7 @@ tcga_heuristic_accuracy <- tcga_heuristic %>%
 tcga_heuristic_accuracy_plot <- tcga_heuristic_accuracy %>%
   ggplot(aes(x = proj, fill = interest, y = pos_rate)) +
   geom_col(position = "dodge") +
-  theme_large() +
+  theme_large(base_size = 25) +
   theme(legend.position = "bottom") +
   labs(fill = "", x = "Cancer Type", y = "Proportion of Cases with MH Score > 0") +
   coord_flip() +
@@ -163,13 +183,14 @@ false_neg_ids <- true_pos %>% filter(diff <= 0) %>% pull(case_id)
 
 false_neg_viz <- mitcn_chr_summary %>%
   filter(case_id %in% false_neg_ids) %>%
-  mutate(group = factor(group, levels = c('Near-Haploid', 'Low-Hypodiploid', 'Hyperdiploid', 'Other'))) %>%
+  mutate(group = ifelse(group %in% c('Hyperdiploid', 'Other'), 'Masked', group)) %>%
+  mutate(group = factor(group, levels = c('Masked', 'Near-Haploid', 'Low-Hypodiploid'))) %>%
   ggplot(aes(x = factor(sub("chr", "", chr), levels = 1:22), y = group, fill = as.factor(chr_somy))) +
   geom_tile() +
   facet_wrap(~case_id, ncol = 1, scales = "free_y") +
   labs(fill = "Somy", x = "Chromosome", y = "") +
   scale_fill_viridis_d(option = "mako") +
-  theme_large() +
+  theme_large(base_size = 25) +
   theme(legend.position = "right", strip.background = element_blank(), strip.text = element_blank()) +
   ggtitle('(c)')
 
@@ -178,7 +199,7 @@ heh_spec <- heh_aut %>% #no subclonality because I can't count autosomes when th
   mutate(id = row_number()) %>%
   ggplot(aes(x = chrs, y = id, colour = diff > 0)) +
   geom_point() +
-  theme_large() +
+  theme_large(base_size = 25) +
   ylab("Case") +
   labs(colour = "MH score > 0", subtitle = "Woodward et al (high-hyperdiploid cases, no subclonality, N = 414)", x = "Autosomes") +
   geom_vline(xintercept = 45.5, colour = "darkred") +
@@ -186,14 +207,14 @@ heh_spec <- heh_aut %>% #no subclonality because I can't count autosomes when th
   scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
   theme(legend.position = "none") +
   scale_x_continuous(limits = c(45, 89)) +
-  ggtitle('(f)')
+  ggtitle('(g)')
 
 mh <- true_pos %>%
   group_by(chrs) %>%
   mutate(id = row_number()) %>%
   ggplot(aes(x = chrs, y = id, colour = diff > 0)) +
   geom_point(size = 2) +
-  theme_large() +
+  theme_large(base_size = 25) +
   ylab("Case") +
   labs(colour = "MH score > 0", subtitle = "Subclonal masked hypodiploids, N = 126", x = "Autosomes") +
   geom_vline(xintercept = 45.5, colour = "darkred") +
@@ -201,14 +222,14 @@ mh <- true_pos %>%
   scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
   theme(legend.position = "bottom") +
   scale_x_continuous(limits = c(45, 89)) +
-  ggtitle('(e)')
+  ggtitle('(f)')
 
 fully_masked_plot <- scores_mit %>%
   left_join(mitcn_meta, by = c("id", "case_id", "group")) %>%
   filter(diff > 0, n_chr_nosex < 77, any_lows == 0, n_chr_nosex >= 46) %>%
   ggplot(aes(x = n_chr_nosex)) +
   geom_bar(fill = "black") +
-  theme_large() +
+  theme_large(base_size = 25) +
   xlab("Autosomes") +
   ylab("Inferred Fully-Masked Cases") +
   labs(subtitle = "Inferred Fully-Masked Cases") +
@@ -241,7 +262,7 @@ target_spec <- target_classes %>%
   geom_point(size = 2) +
   geom_vline(xintercept = 45.5, colour = "darkred") +
   geom_vline(xintercept = 76, colour = "darkred") +
-  theme_large() +
+  theme_large(base_size = 25) +
   labs(colour = "MH score > 0", subtitle = "TARGET (non-hypodiploid cases with > 44 autosomes, N = 66)") +
   scale_colour_manual(values = c(`FALSE` = "#CC79A7", `TRUE` = "darkblue")) +
   ylab("Cases") +
@@ -252,9 +273,18 @@ fig2 <- (viz) / (scatter | overlap | confusion) / (mh | (heh_spec / target_spec)
 ggsave(plot = fig2, file =  'paper/MH_Score_fig.png', width = 28, height = 30)
 ggsave(plot = fig2, file = 'paper/hypo_fig2_MH_Score.pdf', width = 28, height = 30)
 
+img <- fig('~/Downloads/MH Schematic.png')
+fig2_revised <- (img | viz) / (scatter | overlap | confusion) / (mh | (heh_spec / target_spec))
+ggsave(plot = fig2_revised, file = 'paper/fig2_MH_Score_revised.pdf', width = 28, height = 30)
+
+
 figsMH <- (rare_tetra | tcga_overlap) / (false_neg_viz | fully_masked_plot) 
 ggsave(plot = figsMH, file =  'paper/Supp_MH_score.png', width = 25, height = 20)
 ggsave(plot = figsMH, file = 'paper/hypo_supp_fig1_MH_score.pdf', width = 25, height = 20)
+
+figsMH_revised <- (rare_tetra | tcga_overlap) / (false_neg_viz) / (fully_masked_plot | tcga_heuristic_cancer_types) 
+ggsave(plot = figsMH_revised, file = 'paper/supp_fig2_MH_score_revised.pdf', width = 25, height = 30)
+
 
 # number of cases analysed by MEDICC
 nrow(med) #148 --> 150

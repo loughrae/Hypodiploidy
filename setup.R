@@ -51,8 +51,7 @@ ga <- read.table('~/Downloads/genes_arms.bed', sep = '\t') %>% add_count(V4) %>%
 ascat_medicc <- fread('ASCAT_MEDICC_calls.tsv', header = T)
 
 ## clinical data
-clin <- read.table("~/Downloads/clin_query.txt", sep = "\t", header = T) %>% 
-  select(submitter_id, age_at_index, gender, race, disease, vital_status, days_to_death, days_to_last_follow_up)
+clin  <- fread('~/Downloads/TCGA-CDR-SupplementalTableS1(2).csv') #Liu paper, from the PanCanAtlas page (https://gdc.cancer.gov/about-data/publications/pancanatlas)
 
 # theme
 theme_large_base <- function(base_theme, base_size = 20, base_family = "") {
@@ -112,4 +111,19 @@ pairwise_comparisons <- list(
   c("Polyploid", "Low-Hypodiploid")
 )
 
-#
+pairwise_comparisons_short <- list(
+c("Diploid", "Polyploid"),
+c("Diploid", "LH"),
+c("Polyploid", "LH"),
+c('LH', 'Aneuploid'),
+c('LH', 'NH')
+)
+
+pairwise_comparisons_short_noNH <- list(
+  c("Diploid", "Polyploid"),
+  c("Diploid", "LH"),
+  c("Polyploid", "LH"),
+  c('LH', 'Aneuploid')
+)
+
+

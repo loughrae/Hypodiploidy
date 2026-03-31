@@ -12,10 +12,17 @@ autosome_count_mit <- mitcn_meta %>%
   filter(n_chr_nosex < 44) %>%
   ggplot(aes(x = n_chr_nosex)) +
   geom_bar(fill = "black") +
-  labs(subtitle = "(a) Acute lymphoblastic leukemia (ALL)", x = "Autosome Count", y = "Cases") +
-  geom_vline(xintercept = 27.5, colour = 'red', linetype = 'dashed') + 
-  geom_vline(xintercept = hypo_threshold - 0.5, colour = 'blue', linetype = 'dashed') +
-  theme_large_classic()
+  labs(subtitle = "(a) Acute lymphoblastic leukemia (ALL)", x = "Autosome Count", y = "Cases", size = 24) +
+  geom_vline(xintercept = 27.5, colour = 'red', linetype = 'dashed', linewidth = 1) + 
+  scale_x_continuous(limits = c(22, 44), breaks = seq(25, 40, by = 5)) +
+  geom_vline(xintercept = hypo_threshold - 0.5, colour = 'blue', linetype = 'dashed', linewidth = 1) +
+  theme_large_classic() +
+  theme(plot.subtitle = element_text(size = 22)) +
+  annotate("text", x = 33, y = 500, label = "Low-Hypodiploid", size = 7) +
+  annotate("text", x = 24, y = 500, label = 'Near-Haploid', size = 7)
+
+
+
 
 autosomes_graph <- function(df, title) {
   df %>%
@@ -25,11 +32,11 @@ autosomes_graph <- function(df, title) {
     geom_bar() +
     scale_x_continuous(limits = c(22, 44), breaks = seq(25, 40, by = 5)) +
     labs(subtitle = title, x = "Inferred Autosome Count", y = "Cases", fill = "") +
-    theme_large() +
-    geom_vline(xintercept = 27.5, colour = 'darkblue', linetype = 'dashed') +
-    geom_vline(xintercept = hypo_threshold - 0.5, colour = 'darkblue', linetype = 'dashed') +
+    geom_vline(xintercept = 27.5, colour = 'darkblue', linetype = 'dashed', linewidth = 1) +
+    geom_vline(xintercept = hypo_threshold - 0.5, colour = 'darkblue', linetype = 'dashed', linewidth = 1) +
     scale_fill_manual(values = c(`No WGD` = 'black', `WGD` = "lightsteelblue")) + 
-    theme_large_classic() + theme(legend.position = 'bottom') 
+    theme_large_classic() + theme(legend.position = 'bottom') +
+    theme(plot.subtitle = element_text(size = 22)) 
 }
 
 cts_tcga <- tcga_classes %>% autosomes_graph('Pan-TCGA') + theme(legend.position = 'none')
@@ -38,6 +45,8 @@ cts_kich <- tcga_classes %>% filter(proj == 'KICH') %>% autosomes_graph('Kidney 
 cts_acc <- tcga_classes %>% filter(proj == 'ACC') %>% autosomes_graph('Adrenocortical (ACC)')
 cts_sarc <- tcga_classes %>% filter(proj == 'SARC') %>% autosomes_graph('Sarcoma (SARC)')
 
+fig1a <- autosome_count_mit / (cts_tcga) / (cts_brca | cts_kich) / (cts_acc | cts_sarc)
+ggsave('paper/fig1a_rev.png', width = 25, height = 30)
 ## fig1b: hypodiploid proportions
 hypo_props <- tcga_classes %>%
   group_by(proj) %>%
@@ -70,7 +79,10 @@ class_props <- tcga_classes %>%
   labs(x = "", y = "Proportion of Cases", subtitle = '(b)') +
   guides(fill = guide_legend(reverse = TRUE))
 
+tcga_proj_counts <- tcga_classes %>% count(proj)
+
 class_props_facets <- tcga_classes %>%
+  add_count(proj) %>%
   group_by(proj) %>%
   mutate(prop_hypo = mean(group != "Other")) %>%
   mutate(set = ifelse(prop_hypo > 0.5, 'Hypodiploid', ifelse(prop_hypo > 0.05, '≥5% Hypodiploid', '<5% Hypodiploid'))) %>%
@@ -90,7 +102,38 @@ class_props_facets <- tcga_classes %>%
     axis.text.y = element_text(size = 12),
     strip.background = element_blank(),  
     legend.position = "bottom"
+  ) +
+  theme(plot.subtitle = element_text(size = 22)) 
+
+
+fig1_prevalence <- fig1a / class_props_facets
+ggsave(plot = fig1_prevalence, file = 'paper/fig1_prevalence_revised.pdf', width = 25, height = 30)
+
+class_props_absolute <- tcga_classes %>%
+  add_count(proj) %>%
+  group_by(proj) %>%
+  mutate(prop_hypo = mean(group != "Other")) %>%
+  mutate(set = ifelse(prop_hypo > 0.5, 'Hypodiploid', ifelse(prop_hypo > 0.05, '≥5% Hypodiploid', '<5% Hypodiploid'))) %>%
+  mutate(set = factor(set, levels = c('Hypodiploid', '≥5% Hypodiploid', '<5% Hypodiploid'))) %>%
+  mutate(Class = fct_rev(factor(Class, levels = c("Near-Haploid", "Low-Hypodiploid", "Diploid", "Aneuploid", "Polyploid")))) %>%
+  ggplot(aes(x = reorder(paste0(proj, ' (', n, ')'), -prop_hypo), fill = Class)) +
+  geom_bar(position = "stack") +
+  scale_fill_manual(values = class_palette) +
+  theme_large_classic() +
+  theme(axis.text.y = element_text(size = 12)) +
+  theme(legend.position = "bottom") +
+  facet_wrap(~set, scales = 'free_x') +
+  labs(x = "", y = "Number of Cases") +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    strip.background = element_blank(),  
+    legend.position = "bottom"
   )
+
+ggsave(plot = class_props_absolute, file = 'paper/supp_fig1_prevalence_revised.pdf', width = 20, height = 15)
+
 
 ## Stats in text ##
 
